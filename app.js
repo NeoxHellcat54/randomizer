@@ -30,7 +30,10 @@ const defaults = {
   punishmentCostMultiplier: 1,
   theEndCostBonus: 0,
   theEndUnlocked: false,
-  lastSeenDate: null
+  lastSeenDate: null,
+  rsbdYears: {},
+  forceRSBDToday: false,
+  adjudicatedDates: {}
 };
 
 let data = load();
@@ -654,7 +657,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=9").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=10").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -1129,5 +1132,330 @@ render = function(){
 
 processMissedDays();
 ensureV9Data();
+save();
+render();
+
+
+/* =========================
+   V10 Random Sissy Bimbo Day
+========================= */
+
+function localDateString(dateObj = new Date()){
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth()+1).padStart(2,"0");
+  const d = String(dateObj.getDate()).padStart(2,"0");
+  return `${y}-${m}-${d}`;
+}
+
+function parseLocalDate(dateStr){
+  const [y,m,d] = dateStr.split("-").map(Number);
+  return new Date(y, m-1, d);
+}
+
+function formatDate(dateObj){
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth()+1).padStart(2,"0");
+  const d = String(dateObj.getDate()).padStart(2,"0");
+  return `${y}-${m}-${d}`;
+}
+
+function seededRandom(seed){
+  // Small deterministic PRNG so every stored year is stable after generation.
+  let x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+function generateRSBDDatesForYear(year){
+  const start = new Date(year, 0, 1);
+  const end = new Date(year, 11, 31);
+  const daysInYear = Math.floor((end - start) / 86400000) + 1;
+  const segmentSize = daysInYear / 8;
+  const dates = [];
+
+  for(let i=0;i<8;i++){
+    const segStart = Math.floor(i * segmentSize);
+    const segEnd = Math.floor(((i+1) * segmentSize) - 1);
+    const seed = (year * 1000) + (i * 97) + 37 + Math.floor(Math.random()*1000000);
+    const offset = segStart + Math.floor(seededRandom(seed) * (segEnd - segStart + 1));
+    const date = new Date(year, 0, 1 + offset);
+    dates.push(formatDate(date));
+  }
+
+  return [...new Set(dates)].sort();
+}
+
+function ensureRSBDYear(year = new Date().getFullYear()){
+  data.rsbdYears ??= {};
+  if(!data.rsbdYears[year] || data.rsbdYears[year].length !== 8){
+    data.rsbdYears[year] = generateRSBDDatesForYear(Number(year));
+    save();
+  }
+  return data.rsbdYears[year];
+}
+
+function isRSBD(dateStr = localDateString()){
+  ensureRSBDYear(parseLocalDate(dateStr).getFullYear());
+  return data.forceRSBDToday && dateStr === localDateString()
+    ? true
+    : (data.rsbdYears?.[parseLocalDate(dateStr).getFullYear()] || []).includes(dateStr);
+}
+
+function datesBetweenExclusive(startStr, endStr){
+  const dates = [];
+  let d = parseLocalDate(startStr);
+  d.setDate(d.getDate() + 1);
+  const end = parseLocalDate(endStr);
+  while(d < end){
+    dates.push(formatDate(d));
+    d.setDate(d.getDate()+1);
+  }
+  return dates;
+}
+
+function adjudicatePreviousRolledDayIfNeeded(){
+  data.adjudicatedDates ??= {};
+  const r = data.todayResults;
+  if(!r || !r.date || data.adjudicatedDates[r.date]) return;
+  if(r.date === localDateString()) return;
+
+  const tasks = r.tasks || [];
+  const incomplete = tasks.filter(t => !t.complete).length;
+
+  if(incomplete > 0){
+    if(r.rsbd){
+      addPunishmentBar(incomplete);
+    } else {
+      addPunishmentBar(1);
+    }
+  }
+
+  data.adjudicatedDates[r.date] = true;
+  save();
+}
+
+function processSkippedRSBDSinceLastSeen(){
+  const t = localDateString();
+  if(!data.lastSeenDate){
+    data.lastSeenDate = t;
+    save();
+    return;
+  }
+
+  const missed = datesBetweenExclusive(data.lastSeenDate, t);
+  for(const dateStr of missed){
+    ensureRSBDYear(parseLocalDate(dateStr).getFullYear());
+    if(isRSBD(dateStr)){
+      addPunishmentBar(10);
+    }
+  }
+
+  data.lastSeenDate = t;
+  save();
+}
+
+function rsbdFillExactlySevenTasks(){
+  const all = data.taskTags.flatMap(tag => tag.tasks.map(task => ({
+    key: tag.id + ":" + task.id,
+    tag: tag.name,
+    name: task.name,
+    probability: Number(task.probability)||0
+  })));
+
+  const results = [];
+  const used = new Set();
+
+  while(results.length < 7 && all.length){
+    let pool = all.filter(x => !used.has(x.key));
+    if(!pool.length){
+      // If the user has fewer than 7 tasks configured, allow repeats only after all unique tasks are used.
+      pool = all;
+    }
+    const picked = pool[Math.floor(Math.random()*pool.length)];
+    used.add(picked.key);
+    results.push({
+      id: uid(),
+      tag: picked.tag,
+      name: picked.name,
+      complete: false,
+      rsbd: true,
+      pointsBase: 100 - picked.probability
+    });
+  }
+
+  return results;
+}
+
+function rollOutfits(forceAll=false){
+  const rolledTags = [];
+
+  for(const tag of data.outfitTags){
+    if(tag.items.length && (forceAll || chance(tag.probability))){
+      rolledTags.push(tag.id);
+    }
+  }
+
+  let bundles = rolledTags.map(tagId => buildOutfitBundle(tagId)).filter(bundle => bundle.length > 0);
+  bundles = resolveOutfitBundleConflicts(bundles);
+
+  const finalTagIds = [];
+  for(const bundle of bundles){
+    for(const tagId of bundle){
+      if(!finalTagIds.includes(tagId)) finalTagIds.push(tagId);
+    }
+  }
+
+  const results = [];
+  for(const tagId of finalTagIds){
+    const tag = getOutfitTagById(tagId);
+    if(!tag || !tag.items.length) continue;
+    const item = tag.items[Math.floor(Math.random()*tag.items.length)];
+    results.push({tag: tag.name, name: item.name});
+  }
+
+  return results;
+}
+
+function rollRoulette(force=false){
+  const effective = data.roulette.base + data.roulette.cumTax;
+  if(force || chance(effective)){
+    const picked = weightedRoll(data.roulette.entries);
+    data.roulette.cumTax = 0;
+    data.roulette.base = Math.round((data.roulette.base + 0.5) * 10) / 10;
+    return {triggered:true, name:picked ? picked.name : "No roulette entry configured", url:picked ? picked.url : ""};
+  }
+  return {triggered:false};
+}
+
+function rollAllV10(){
+  if(endGameActive()) return;
+  const t = localDateString();
+  if(data.lastRollDate === t) return alert("Today's Roll All has already been used.");
+
+  adjudicatePreviousRolledDayIfNeeded();
+
+  const rsbd = isRSBD(t);
+  const results = {date:t, rsbd};
+
+  const chastityYes = rsbd ? true : chance(data.chastityProbability);
+  results.chastity = {result: chastityYes ? "YES" : "NO", cage: null};
+  if(chastityYes){
+    const cage = weightedRoll(data.cages);
+    results.chastity.cage = cage ? cage.name : "No cage configured";
+  } else {
+    data.chastityProbability += chastityIncreaseAmount();
+  }
+
+  const contentRolls = chance(upgradeLevel("contentDouble")) ? 2 : 1;
+  const gameRolls = chance(upgradeLevel("gameDouble")) ? 2 : 1;
+  const contentResults = [];
+  const gameResults = [];
+  for(let i=0;i<contentRolls;i++){
+    const c = weightedRoll(data.content);
+    contentResults.push(c ? c.name : "No content configured");
+  }
+  for(let i=0;i<gameRolls;i++){
+    const g = weightedRoll(data.games);
+    gameResults.push(g ? g.name : "No game configured");
+  }
+
+  results.content = contentResults.join(" + ");
+  results.game = gameResults.join(" + ");
+  results.tasks = rsbd ? rsbdFillExactlySevenTasks() : rollTasks();
+  results.outfits = rollOutfits(rsbd);
+  results.roulette = rollRoulette(rsbd);
+
+  data.lastRollDate = t;
+  data.lastSeenDate = t;
+  data.rewardGrantedDate = null;
+  data.todayResults = results;
+  save();
+  render();
+
+  if(rsbd){
+    alert("✨ Random Sissy Bimbo Day ✨\nSpecial rules are active today.");
+  }
+
+  if(results.roulette.triggered && results.roulette.url){
+    window.open(results.roulette.url, "_blank");
+  }
+}
+
+const rollBtnV10 = document.getElementById("rollAllBtn");
+if(rollBtnV10){
+  rollBtnV10.onclick = rollAllV10;
+}
+
+// Override task completion for RSBD: no points and no reward.
+window.toggleTodayTask = (taskId,checked) => {
+  const tasks = data.todayResults?.tasks || [];
+  const task = tasks.find(x=>x.id===taskId);
+  if(task) task.complete = checked;
+  const allDone = tasks.length && tasks.every(x=>x.complete);
+
+  if(allDone && data.rewardGrantedDate !== localDateString()){
+    if(data.todayResults?.rsbd){
+      data.rewardGrantedDate = localDateString();
+      alert("RSBD tasks complete. No points and no reward progress are gained today.");
+    } else {
+      const earned = calculateTaskPoints(tasks);
+      data.points += earned;
+      data.lifetimePoints += Math.max(0, earned);
+
+      if(data.reward.locked && !activeEffect("rewardFrozen")){
+        data.reward.progress = Math.min(data.reward.target, data.reward.progress + 1);
+      }
+
+      data.rewardGrantedDate = localDateString();
+      alert(`All tasks complete. You earned ${earned} points.` + (activeEffect("rewardFrozen") ? "\nReward progress is frozen by punishment." : ""));
+    }
+  }
+  save(); render();
+};
+
+function renderRSBD(){
+  ensureRSBDYear(new Date().getFullYear());
+  const banner = document.getElementById("rsbdBanner");
+  if(banner) banner.classList.toggle("hidden", !isRSBD(localDateString()));
+
+  if(data.todayResults?.rsbd){
+    const results = document.getElementById("results");
+    if(results && !results.classList.contains("hidden")){
+      if(!results.querySelector(".rsbd-result-note")){
+        results.insertAdjacentHTML("afterbegin", `<div class="rsbd-result-note">✨ Random Sissy Bimbo Day: 100% Chastity, 100% Roulette, all outfits forced, exactly 7 tasks, no points/reward.</div>`);
+      }
+    }
+  }
+}
+
+// Patch old render wrapper again.
+const renderBeforeRSBD = render;
+render = function(){
+  renderBeforeRSBD();
+  renderRSBD();
+};
+
+// Dev tools
+const devForceRSBD = document.getElementById("devForceRSBD");
+if(devForceRSBD){
+  devForceRSBD.onclick = () => {
+    data.forceRSBDToday = !data.forceRSBDToday;
+    save(); render();
+    alert("Force RSBD Today: " + (data.forceRSBDToday ? "ON" : "OFF"));
+  };
+}
+const devShowRSBD = document.getElementById("devShowRSBD");
+if(devShowRSBD){
+  devShowRSBD.onclick = () => {
+    const year = new Date().getFullYear();
+    const dates = ensureRSBDYear(year);
+    alert(`RSBD dates for ${year}:\n` + dates.join("\n"));
+  };
+}
+
+// Initial yearly generation/adjudication.
+// Generates the full current year even if today is mid-year.
+ensureRSBDYear(new Date().getFullYear());
+adjudicatePreviousRolledDayIfNeeded();
+processSkippedRSBDSinceLastSeen();
 save();
 render();

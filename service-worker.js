@@ -1,7 +1,7 @@
-const CACHE = "sissy-random-v9";
+const CACHE = "sissy-random-v10";
 const ASSETS = [
-  "./styles.css?v=9",
-  "./app.js?v=9",
+  "./styles.css?v=10",
+  "./app.js?v=10",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",

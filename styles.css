@@ -328,3 +328,33 @@ input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(255,120,186,.12)}
     width:100%;
   }
 }
+
+
+/* V10 RSBD */
+.rsbd-banner{
+  text-align:center;
+  margin:12px 0;
+  padding:16px;
+  border-radius:28px;
+  background:linear-gradient(135deg, rgba(255,120,186,.95), rgba(203,183,255,.95));
+  color:white;
+  font-weight:1000;
+  box-shadow:var(--shadow);
+  border:1px solid rgba(255,255,255,.65);
+}
+.rsbd-banner span{
+  display:block;
+  margin-top:4px;
+  font-size:.9rem;
+  font-weight:800;
+  opacity:.92;
+}
+.rsbd-result-note{
+  margin-bottom:10px;
+  padding:10px;
+  border-radius:18px;
+  background:linear-gradient(135deg, rgba(255,232,243,.95), rgba(241,234,255,.95));
+  color:var(--pink2);
+  font-weight:900;
+  line-height:1.35;
+}
