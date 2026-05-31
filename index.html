@@ -3,22 +3,28 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Sissy Random V2</title>
+  <title>Sissy Random</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="app">
-    <header class="hero">
-      <div>
-        <p class="eyebrow">Daily Randomizer</p>
-        <h1>💖 Sissy Random</h1>
+  <div class="bg-glow glow-one"></div>
+  <div class="bg-glow glow-two"></div>
+
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="title-wrap">
+        <div class="heart-badge">♡</div>
+        <div>
+          <p class="eyebrow">Daily Randomizer</p>
+          <h1>Sissy's Daily Randomizer</h1>
+        </div>
       </div>
 
-      <section class="reward-card">
+      <section class="reward-card glass">
         <div class="reward-top">
           <div>
-            <span class="label">Current Reward</span>
+            <span class="label">Current reward</span>
             <h2 id="rewardTitle">No reward active</h2>
           </div>
           <span id="rewardLockBadge" class="badge">Unlocked</span>
@@ -29,27 +35,27 @@
           <span id="rewardProgress">0 / 0 days</span>
         </div>
 
-        <div class="reward-actions">
-          <button id="presetRewardBtn" class="soft">Use Chastity Decrease Preset</button>
-          <button id="lockRewardBtn">Lock Reward</button>
-          <button id="claimRewardBtn" class="claim hidden">Claim Reward</button>
-        </div>
-
-        <div id="rewardEditor" class="inline-form">
+        <div id="rewardEditor" class="stacked-form">
           <input id="rewardNameInput" placeholder="Reward name" />
           <input id="rewardTargetInput" type="number" min="1" step="1" placeholder="Target days" />
         </div>
+
+        <div class="reward-actions">
+          <button id="presetRewardBtn" class="ghost">Chastity Decrease Preset</button>
+          <button id="lockRewardBtn">Lock Reward</button>
+          <button id="claimRewardBtn" class="claim hidden">Claim Reward</button>
+        </div>
       </section>
 
-      <section class="roll-card">
-        <button id="rollAllBtn" class="roll">🎲 Roll All</button>
+      <section class="roll-card glass">
+        <button id="rollAllBtn" class="roll">Roll All</button>
         <div id="rollStatus" class="muted"></div>
       </section>
     </header>
 
-    <section id="results" class="results-card hidden"></section>
+    <section id="results" class="results-card glass hidden"></section>
 
-    <nav class="tabs" aria-label="App tabs">
+    <nav class="tabs glass" aria-label="App tabs">
       <button class="tab active" data-tab="chastity">Chastity</button>
       <button class="tab" data-tab="content">Content</button>
       <button class="tab" data-tab="game">Game</button>
@@ -59,87 +65,91 @@
     </nav>
 
     <main>
-      <section id="chastity" class="panel">
+      <section id="chastity" class="panel glass">
         <div class="panel-head">
-          <h2>Chastity</h2>
+          <div>
+            <p class="section-kicker">Probability</p>
+            <h2>Chastity</h2>
+          </div>
           <div class="big-stat"><span id="chastityProb">60</span>%</div>
         </div>
-        <p class="muted">Visible probability. NO increases by 1%. YES rolls a cage from the weighted cage pool.</p>
+        <p class="muted">NO increases by 1%. YES rolls a cage from your weighted cage pool.</p>
 
-        <div class="card">
+        <div class="inner-card">
           <h3>Cage Pool</h3>
           <div class="inline-form">
             <input id="cageName" placeholder="Cage name" />
             <input id="cageWeight" type="number" min="1" step="1" placeholder="Weight" />
-            <button id="addCage">Add Cage</button>
+            <button id="addCage">Add</button>
           </div>
           <div id="cageList" class="list"></div>
         </div>
       </section>
 
-      <section id="content" class="panel hidden">
-        <div class="panel-head"><h2>Content</h2></div>
-        <p class="muted">Traditional weighted roll. Exactly one option is chosen.</p>
-        <div class="card">
+      <section id="content" class="panel glass hidden">
+        <div class="panel-head"><div><p class="section-kicker">Weighted list</p><h2>Content</h2></div></div>
+        <p class="muted">Exactly one option is chosen, with higher weights appearing more often.</p>
+        <div class="inner-card">
           <div class="inline-form">
             <input id="contentName" placeholder="Content name" />
             <input id="contentWeight" type="number" min="1" step="1" placeholder="Weight" />
-            <button id="addContent">Add Content</button>
+            <button id="addContent">Add</button>
           </div>
           <div id="contentList" class="list"></div>
         </div>
       </section>
 
-      <section id="game" class="panel hidden">
-        <div class="panel-head"><h2>Game</h2></div>
-        <p class="muted">Traditional weighted roll. Exactly one option is chosen.</p>
-        <div class="card">
+      <section id="game" class="panel glass hidden">
+        <div class="panel-head"><div><p class="section-kicker">Weighted list</p><h2>Game</h2></div></div>
+        <p class="muted">Exactly one option is chosen, with higher weights appearing more often.</p>
+        <div class="inner-card">
           <div class="inline-form">
             <input id="gameName" placeholder="Game name" />
             <input id="gameWeight" type="number" min="1" step="1" placeholder="Weight" />
-            <button id="addGame">Add Game</button>
+            <button id="addGame">Add</button>
           </div>
           <div id="gameList" class="list"></div>
         </div>
       </section>
 
-      <section id="roulette" class="panel hidden">
+      <section id="roulette" class="panel glass hidden">
         <div class="panel-head">
-          <h2>Roulette</h2>
-          <div class="stats-row">
-            <span>Base: <b id="rouletteBase">1</b>%</span>
-            <span>Cum Tax: <b id="rouletteTax">0</b>%</span>
-            <span>Effective: <b id="rouletteEffective">1</b>%</span>
-          </div>
+          <div><p class="section-kicker">Cum tax</p><h2>Roulette</h2></div>
         </div>
 
-        <div class="card">
+        <div class="stat-pills">
+          <span>Base <b id="rouletteBase">1</b>%</span>
+          <span>Cum Tax <b id="rouletteTax">0</b>%</span>
+          <span>Effective <b id="rouletteEffective">1</b>%</span>
+        </div>
+
+        <div class="inner-card">
           <button id="cumTaxBtn" class="wide">+1 Cum Tax</button>
         </div>
 
-        <div class="card">
+        <div class="inner-card">
           <h3>Roulette Entries</h3>
           <div class="inline-form">
             <input id="rouletteName" placeholder="Name" />
             <input id="rouletteUrl" placeholder="URL" />
             <input id="rouletteWeight" type="number" min="1" step="1" placeholder="Weight" />
-            <button id="addRoulette">Add Roulette</button>
+            <button id="addRoulette">Add</button>
           </div>
           <div id="rouletteList" class="list"></div>
         </div>
       </section>
 
-      <section id="tasks" class="panel hidden">
-        <div class="panel-head"><h2>Tasks</h2></div>
-        <p class="muted">Each task rolls independently. Each tag can only output one task. If nothing hits, one task is chosen randomly from all tasks.</p>
+      <section id="tasks" class="panel glass hidden">
+        <div class="panel-head"><div><p class="section-kicker">Daily completion</p><h2>Tasks</h2></div></div>
+        <p class="muted">Each task rolls independently. Each tag can only output one task. If nothing hits, one random task is chosen.</p>
 
-        <div class="card">
+        <div class="inner-card today-card">
           <h3>Today's Tasks</h3>
           <div id="todayTasks" class="check-list muted">No tasks rolled yet.</div>
         </div>
 
-        <div class="card">
-          <h3>Add Task Tag</h3>
+        <div class="inner-card">
+          <h3>Task Tags</h3>
           <div class="inline-form">
             <input id="taskTagName" placeholder="Tag name" />
             <button id="addTaskTag">Add Tag</button>
@@ -148,17 +158,17 @@
         </div>
       </section>
 
-      <section id="outfits" class="panel hidden">
-        <div class="panel-head"><h2>Outfits</h2></div>
-        <p class="muted">Each outfit tag has its own probability. If it hits, one item from that tag is selected.</p>
+      <section id="outfits" class="panel glass hidden">
+        <div class="panel-head"><div><p class="section-kicker">Probability tags</p><h2>Outfits</h2></div></div>
+        <p class="muted">Each tag rolls its own probability. If it hits, one item from that tag is selected.</p>
 
-        <div class="card">
+        <div class="inner-card today-card">
           <h3>Today's Outfit</h3>
           <div id="todayOutfit" class="muted">No outfit rolled yet.</div>
         </div>
 
-        <div class="card">
-          <h3>Add Outfit Tag</h3>
+        <div class="inner-card">
+          <h3>Outfit Tags</h3>
           <div class="inline-form">
             <input id="outfitTagName" placeholder="Tag name" />
             <input id="outfitTagProb" type="number" min="0" max="100" step="1" placeholder="Probability %" />
