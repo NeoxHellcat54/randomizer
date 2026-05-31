@@ -1,7 +1,7 @@
-const CACHE = "sissy-random-v10";
+const CACHE = "sissy-random-v11";
 const ASSETS = [
-  "./styles.css?v=10",
-  "./app.js?v=10",
+  "./styles.css?v=11",
+  "./app.js?v=11",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
@@ -28,28 +28,21 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("fetch", event => {
   const req = event.request;
-
   if (req.mode === "navigate") {
     event.respondWith(
-      fetch(req)
-        .then(resp => {
-          const copy = resp.clone();
-          caches.open(CACHE).then(cache => cache.put("./", copy));
-          return resp;
-        })
-        .catch(() => caches.match("./").then(cached => cached || caches.match("./index.html")))
+      fetch(req).then(resp => {
+        const copy = resp.clone();
+        caches.open(CACHE).then(cache => cache.put("./", copy));
+        return resp;
+      }).catch(() => caches.match("./").then(cached => cached || caches.match("./index.html")))
     );
     return;
   }
-
   event.respondWith(
-    caches.match(req).then(cached => {
-      if (cached) return cached;
-      return fetch(req).then(resp => {
-        const copy = resp.clone();
-        caches.open(CACHE).then(cache => cache.put(req, copy));
-        return resp;
-      });
-    })
+    caches.match(req).then(cached => cached || fetch(req).then(resp => {
+      const copy = resp.clone();
+      caches.open(CACHE).then(cache => cache.put(req, copy));
+      return resp;
+    }))
   );
 });

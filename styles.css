@@ -272,89 +272,37 @@ input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(255,120,186,.12)}
 }
 
 
-/* V9 points/upgrades/punishments */
-.points-summary h2{
-  margin:0;
-  font-size:1.15rem;
-}
-.upgrade-list{
-  display:grid;
-  gap:10px;
-  margin-top:12px;
-}
+/* V11 systems UI */
+.points-summary h2{margin:0;font-size:1.15rem}
+.upgrade-list{display:grid;gap:10px;margin-top:12px}
 .upgrade-card{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:10px;
-  padding:12px;
-  border:1px solid var(--line);
-  border-radius:20px;
-  background:rgba(255,255,255,.72);
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:12px;border:1px solid var(--line);border-radius:20px;
+  background:rgba(255,255,255,.72)
 }
-.upgrade-card button{
-  flex:0 0 auto;
-}
+.upgrade-card button{flex:0 0 auto}
 .legendary-end{
   background:linear-gradient(135deg, rgba(255,232,243,.95), rgba(241,234,255,.95));
-  border-color:rgba(255,120,186,.45);
+  border-color:rgba(255,120,186,.45)
 }
 .inner-note{
-  margin:10px 0 14px;
-  padding:10px;
-  border-radius:18px;
-  background:rgba(255,255,255,.55);
-  color:var(--muted);
-  font-size:.9rem;
-  line-height:1.35;
+  margin:10px 0 14px;padding:10px;border-radius:18px;
+  background:rgba(255,255,255,.55);color:var(--muted);
+  font-size:.9rem;line-height:1.35
 }
 .punish-rarity{
-  display:grid;
-  gap:8px;
-  padding:10px;
-  border:1px solid var(--line);
-  border-radius:22px;
-  background:rgba(255,255,255,.55);
+  display:grid;gap:8px;padding:10px;border:1px solid var(--line);
+  border-radius:22px;background:rgba(255,255,255,.55)
 }
-.punish-rarity h3{
-  margin:0;
-}
-@media(max-width:520px){
-  .upgrade-card{
-    align-items:stretch;
-    flex-direction:column;
-  }
-  .upgrade-card button{
-    width:100%;
-  }
-}
-
-
-/* V10 RSBD */
+.punish-rarity h3{margin:0}
 .rsbd-banner{
-  text-align:center;
-  margin:12px 0;
-  padding:16px;
-  border-radius:28px;
+  text-align:center;margin:12px 0;padding:16px;border-radius:28px;
   background:linear-gradient(135deg, rgba(255,120,186,.95), rgba(203,183,255,.95));
-  color:white;
-  font-weight:1000;
-  box-shadow:var(--shadow);
-  border:1px solid rgba(255,255,255,.65);
+  color:white;font-weight:1000;box-shadow:var(--shadow);
+  border:1px solid rgba(255,255,255,.65)
 }
-.rsbd-banner span{
-  display:block;
-  margin-top:4px;
-  font-size:.9rem;
-  font-weight:800;
-  opacity:.92;
-}
-.rsbd-result-note{
-  margin-bottom:10px;
-  padding:10px;
-  border-radius:18px;
-  background:linear-gradient(135deg, rgba(255,232,243,.95), rgba(241,234,255,.95));
-  color:var(--pink2);
-  font-weight:900;
-  line-height:1.35;
+.rsbd-banner span{display:block;margin-top:4px;font-size:.9rem;font-weight:800;opacity:.92}
+@media(max-width:520px){
+  .upgrade-card{align-items:stretch;flex-direction:column}
+  .upgrade-card button{width:100%}
 }

@@ -28,6 +28,7 @@ const defaults = {
   punishmentBar: 0,
   activePunishments: [],
   punishmentCostMultiplier: 1,
+  punishmentBurdenMult: 1,
   theEndCostBonus: 0,
   theEndUnlocked: false,
   lastSeenDate: null,
@@ -657,7 +658,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=10").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=11").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -686,7 +687,7 @@ if(devDressSkirtBtn){
 
 
 /* =========================
-   V9 Points, Upgrades, Punishments, Task Cap
+   V11 Integrated Systems Fix
 ========================= */
 
 const UPGRADE_DEFS = [
@@ -697,6 +698,8 @@ const UPGRADE_DEFS = [
   {id:"taskOverflow", name:"Task Overflow", max:100, desc:"3% chance per level for extra minimum tasks. Overflow ignores tags. Daily cap remains 5."},
   {id:"pointMultiplier", name:"Point Multiplier", max:100, desc:"+1.5% points earned per level."}
 ];
+
+const RARITY_WEIGHTS = {Common:50, Uncommon:30, Rare:12, Epic:6, Legendary:2};
 
 const PUNISHMENTS = [
   {id:"pointDrain", rarity:"Common", name:"Point Drain", desc:"Lose 10% current points.", apply:()=>{data.points -= Math.ceil(Math.abs(data.points) * 0.10);}},
@@ -725,38 +728,66 @@ const PUNISHMENTS = [
   {id:"eternalBurden", rarity:"Legendary", name:"Eternal Burden", desc:"All future punishment bar gains increased by 25%.", apply:()=>{data.punishmentBurdenMult = (data.punishmentBurdenMult||1)*1.25;}}
 ];
 
-const RARITY_WEIGHTS = {Common:50, Uncommon:30, Rare:12, Epic:6, Legendary:2};
-
-function ensureV9Data(){
+function ensureSystemsData(){
   data.points ??= 0;
   data.lifetimePoints ??= 0;
   data.upgrades ??= {};
   data.punishmentBar ??= 0;
   data.activePunishments ??= [];
   data.punishmentCostMultiplier ??= 1;
+  data.punishmentBurdenMult ??= 1;
   data.theEndCostBonus ??= 0;
   data.theEndUnlocked ??= false;
-  data.punishmentBurdenMult ??= 1;
+  data.rsbdYears ??= {};
+  data.forceRSBDToday ??= false;
+  data.adjudicatedDates ??= {};
   for(const u of UPGRADE_DEFS) data.upgrades[u.id] ??= 0;
 }
 
-function effectiveModifiersDisabled(){
-  return activeEffect("disableModifiers") ? true : false;
+function localDateString(dateObj = new Date()){
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth()+1).padStart(2,"0");
+  const d = String(dateObj.getDate()).padStart(2,"0");
+  return `${y}-${m}-${d}`;
 }
-function upgradeLevel(id){
-  if(effectiveModifiersDisabled()) return 0;
-  return Number(data.upgrades?.[id] || 0);
+function parseLocalDate(dateStr){
+  const [y,m,d] = dateStr.split("-").map(Number);
+  return new Date(y, m-1, d);
 }
-function upgradeCost(id){
-  const lvl = Number(data.upgrades?.[id] || 0);
-  return Math.ceil((100 + (4 * lvl)) * (data.punishmentCostMultiplier || 1));
+function formatDate(dateObj){
+  return localDateString(dateObj);
 }
-function isUpgradeCapReached(){
-  return UPGRADE_DEFS.every(u => (data.upgrades?.[u.id] || 0) >= u.max);
+function seededRandom(seed){
+  let x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
 }
-function theEndCost(){
-  return 1000000 + (data.theEndCostBonus || 0);
+function generateRSBDDatesForYear(year){
+  const start = new Date(year,0,1);
+  const daysInYear = Math.floor((new Date(year,11,31)-start)/86400000)+1;
+  const segmentSize = daysInYear / 8;
+  const dates = [];
+  for(let i=0;i<8;i++){
+    const segStart = Math.floor(i*segmentSize);
+    const segEnd = Math.floor(((i+1)*segmentSize)-1);
+    const seed = (year*1000)+(i*97)+37+Math.floor(Math.random()*1000000);
+    const offset = segStart + Math.floor(seededRandom(seed)*(segEnd-segStart+1));
+    dates.push(formatDate(new Date(year,0,1+offset)));
+  }
+  return [...new Set(dates)].sort();
 }
+function ensureRSBDYear(year = new Date().getFullYear()){
+  data.rsbdYears ??= {};
+  if(!data.rsbdYears[year] || data.rsbdYears[year].length !== 8){
+    data.rsbdYears[year] = generateRSBDDatesForYear(Number(year));
+  }
+  return data.rsbdYears[year];
+}
+function isRSBD(dateStr = localDateString()){
+  ensureRSBDYear(parseLocalDate(dateStr).getFullYear());
+  if(data.forceRSBDToday && dateStr === localDateString()) return true;
+  return (data.rsbdYears?.[parseLocalDate(dateStr).getFullYear()] || []).includes(dateStr);
+}
+
 function activeEffect(key){
   for(const p of data.activePunishments || []){
     if(p.effects && p.effects[key]) return p.effects[key];
@@ -770,25 +801,30 @@ function combinedEffectMult(key, fallback=1){
   }
   return mult;
 }
-function addTempPunishment(id, name, days, effects){
-  const existing = data.activePunishments.find(p => p.id === id);
-  if(existing){
-    existing.days += days;
-  } else {
-    data.activePunishments.push({id,name,days,effects});
-  }
+function modifiersDisabled(){ return !!activeEffect("disableModifiers"); }
+function upgradeLevel(id){ return modifiersDisabled() ? 0 : Number(data.upgrades?.[id] || 0); }
+function upgradeCost(id){
+  const lvl = Number(data.upgrades?.[id] || 0);
+  return Math.ceil((100 + (4 * lvl)) * (data.punishmentCostMultiplier || 1));
 }
+function isUpgradeCapReached(){
+  return UPGRADE_DEFS.every(u => (data.upgrades?.[u.id] || 0) >= u.max);
+}
+function theEndCost(){ return 1000000 + (data.theEndCostBonus || 0); }
+function addTempPunishment(id, name, days, effects){
+  const existing = data.activePunishments.find(p=>p.id===id);
+  if(existing) existing.days += days;
+  else data.activePunishments.push({id,name,days,effects});
+}
+function addPunishmentBar(amount){
+  data.punishmentBar = (data.punishmentBar || 0) + (amount * (data.punishmentBurdenMult || 1));
+}
+function availablePunishmentRolls(){ return Math.floor((data.punishmentBar || 0) / 10); }
 function corruptRandomUpgrade(){
   const possible = UPGRADE_DEFS.filter(u => (data.upgrades?.[u.id] || 0) > 0);
   if(!possible.length) return;
   const picked = possible[Math.floor(Math.random()*possible.length)];
   data.upgrades[picked.id] = Math.max(0, (data.upgrades[picked.id]||0)-5);
-}
-function addPunishmentBar(amount){
-  data.punishmentBar = (data.punishmentBar || 0) + (amount * (data.punishmentBurdenMult || 1));
-}
-function availablePunishmentRolls(){
-  return Math.floor((data.punishmentBar || 0) / 10);
 }
 function rollRarity(){
   const entries = Object.entries(RARITY_WEIGHTS);
@@ -816,64 +852,36 @@ function rollAvailablePunishments(){
   save(); render();
   alert("Punishments rolled:\n" + results.map(p=>`${p.rarity}: ${p.name}`).join("\n"));
 }
-
 function decrementDailyEffects(){
   for(const p of data.activePunishments || []) p.days -= 1;
   data.activePunishments = (data.activePunishments || []).filter(p=>p.days > 0);
 }
 
-function processMissedDays(){
-  ensureV9Data();
-  const t = today();
-  if(!data.lastSeenDate){
-    data.lastSeenDate = t;
-    save();
-    return;
-  }
-  const last = new Date(data.lastSeenDate + "T00:00:00");
-  const now = new Date(t + "T00:00:00");
-  const diff = Math.floor((now - last) / 86400000);
-  if(diff <= 0) return;
-
-  for(let i=0;i<diff;i++){
-    decrementDailyEffects();
-    if(activeEffect("dailyPunishmentAdd")) addPunishmentBar(activeEffect("dailyPunishmentAdd"));
-  }
-
-  // For each skipped calendar day where no roll was recorded, add +3.
-  // Conservative: if the previous seen day was also lastRollDate, only days after that count as skipped.
-  addPunishmentBar(3 * diff);
-  data.lastSeenDate = t;
-  save();
+function taxIncreaseAmount(){
+  const base = Math.max(0.01, 1 - (upgradeLevel("taxCut") * 0.01));
+  return base * combinedEffectMult("cumTaxMult", 1);
 }
-
-function endGameActive(){
-  return data.theEndUnlocked === true;
+function chastityIncreaseAmount(){
+  const base = Math.max(0.01, 1 - (upgradeLevel("chastityControl") * 0.01));
+  return base * combinedEffectMult("chastityIncMult", 1);
 }
-
-function capTasks(tasks){
-  const out = [...tasks];
-  while(out.length > 5){
-    out.splice(Math.floor(Math.random()*out.length), 1);
-  }
-  return out;
-}
-
 function taskOverflowMinimum(){
   const lvl = upgradeLevel("taskOverflow");
-  const raw = lvl * 3; // percent
-  const guaranteed = Math.floor(raw / 100);
-  const chancePart = raw % 100;
-  let extra = guaranteed;
-  if(Math.random()*100 < chancePart) extra += 1;
+  const raw = lvl * 3;
+  let extra = Math.floor(raw / 100);
+  if(Math.random()*100 < (raw % 100)) extra += 1;
   return 1 + extra + Number(activeEffect("minTasksAdd") || 0);
 }
-
+function capTasks(tasks){
+  const out = [...tasks];
+  while(out.length > 5) out.splice(Math.floor(Math.random()*out.length), 1);
+  return out;
+}
 function fillMinimumTasks(tasks){
   const minTasks = Math.min(5, taskOverflowMinimum());
   const out = [...tasks];
   const all = data.taskTags.flatMap(tag => tag.tasks.map(task => ({
-    tag: tag.name, name: task.name, probability: Number(task.probability)||0
+    tag:tag.name, name:task.name, probability:Number(task.probability)||0
   })));
   while(out.length < minTasks && all.length){
     const picked = all[Math.floor(Math.random()*all.length)];
@@ -881,8 +889,13 @@ function fillMinimumTasks(tasks){
   }
   return capTasks(out);
 }
+function calculateTaskPoints(tasks){
+  const base = tasks.reduce((s,t)=>s + Number(t.pointsBase ?? 75), 0);
+  const pointUpgradeMult = 1 + (upgradeLevel("pointMultiplier") * 0.015);
+  const punishmentMult = combinedEffectMult("pointGainMult", 1);
+  return Math.round(base * pointUpgradeMult * punishmentMult);
+}
 
-/* Override core roll functions */
 function rollTasks(){
   const results = [];
   for(const tag of data.taskTags){
@@ -901,420 +914,41 @@ function rollTasks(){
   }
   return fillMinimumTasks(results);
 }
-
-function calculateTaskPoints(tasks){
-  const base = tasks.reduce((s,t)=>s + Number(t.pointsBase ?? 75), 0);
-  const pointUpgradeMult = 1 + (upgradeLevel("pointMultiplier") * 0.015);
-  const punishmentMult = combinedEffectMult("pointGainMult", 1);
-  return Math.round(base * pointUpgradeMult * punishmentMult);
-}
-
-function taxIncreaseAmount(){
-  const base = Math.max(0.01, 1 - (upgradeLevel("taxCut") * 0.01));
-  return base * combinedEffectMult("cumTaxMult", 1);
-}
-function chastityIncreaseAmount(){
-  const base = Math.max(0.01, 1 - (upgradeLevel("chastityControl") * 0.01));
-  return base * combinedEffectMult("chastityIncMult", 1);
-}
-
-const oldCumTaxBtn = document.getElementById("cumTaxBtn");
-if(oldCumTaxBtn){
-  oldCumTaxBtn.onclick = () => {
-    data.roulette.cumTax += taxIncreaseAmount();
-    save(); render();
-  };
-}
-
-const rollBtn = document.getElementById("rollAllBtn");
-if(rollBtn){
-  rollBtn.onclick = () => {
-    if(endGameActive()) return;
-    const t = today();
-    if(data.lastRollDate === t) return alert("Today's Roll All has already been used.");
-
-    const results = {};
-    const chastityYes = chance(data.chastityProbability);
-    results.chastity = {result: chastityYes ? "YES" : "NO", cage: null};
-    if(chastityYes){
-      const cage = weightedRoll(data.cages);
-      results.chastity.cage = cage ? cage.name : "No cage configured";
-    } else {
-      data.chastityProbability += chastityIncreaseAmount();
-    }
-
-    const contentRolls = chance(upgradeLevel("contentDouble")) ? 2 : 1;
-    const gameRolls = chance(upgradeLevel("gameDouble")) ? 2 : 1;
-    const contentResults = [];
-    const gameResults = [];
-    for(let i=0;i<contentRolls;i++){
-      const c = weightedRoll(data.content);
-      contentResults.push(c ? c.name : "No content configured");
-    }
-    for(let i=0;i<gameRolls;i++){
-      const g = weightedRoll(data.games);
-      gameResults.push(g ? g.name : "No game configured");
-    }
-    results.content = contentResults.join(" + ");
-    results.game = gameResults.join(" + ");
-
-    results.tasks = rollTasks();
-    results.outfits = rollOutfits();
-    results.roulette = rollRoulette();
-
-    data.lastRollDate = t;
-    data.lastSeenDate = t;
-    data.rewardGrantedDate = null;
-    data.todayResults = results;
-    save();
-    render();
-
-    if(results.roulette.triggered && results.roulette.url){
-      window.open(results.roulette.url, "_blank");
-    }
-  };
-}
-
-function checkYesterdayFailureBeforeNewRoll(){
-  // Reserved for future stricter calendar tracking.
-}
-
-/* Override task complete handler */
-window.toggleTodayTask = (taskId,checked) => {
-  const tasks = data.todayResults?.tasks || [];
-  const task = tasks.find(x=>x.id===taskId);
-  if(task) task.complete = checked;
-  const allDone = tasks.length && tasks.every(x=>x.complete);
-
-  if(allDone && data.rewardGrantedDate !== today()){
-    const earned = calculateTaskPoints(tasks);
-    data.points += earned;
-    data.lifetimePoints += Math.max(0, earned);
-
-    if(data.reward.locked && !activeEffect("rewardFrozen")){
-      data.reward.progress = Math.min(data.reward.target, data.reward.progress + 1);
-    }
-
-    data.rewardGrantedDate = today();
-    alert(`All tasks complete. You earned ${earned} points.` + (activeEffect("rewardFrozen") ? "\nReward progress is frozen by punishment." : ""));
-  }
-  save(); render();
-};
-
-function buyUpgrade(id){
-  ensureV9Data();
-  if(activeEffect("upgradesLocked")) return alert("Upgrades are locked by punishment.");
-  const def = UPGRADE_DEFS.find(u=>u.id===id);
-  if(!def) return;
-  const lvl = data.upgrades[id] || 0;
-  if(lvl >= def.max) return;
-  const cost = upgradeCost(id);
-  if(data.points < cost) return alert("Not enough points.");
-  data.points -= cost;
-  data.upgrades[id] = lvl + 1;
-  save(); render();
-}
-window.buyUpgrade = buyUpgrade;
-
-function buyTheEnd(){
-  if(!isUpgradeCapReached()) return;
-  const cost = theEndCost();
-  if(data.points < cost) return alert("Not enough points.");
-  data.points -= cost;
-  data.theEndUnlocked = true;
-  save(); render();
-}
-window.buyTheEnd = buyTheEnd;
-
-function renderV9(){
-  ensureV9Data();
-
-  const pointsEl = document.getElementById("pointsText");
-  const lifeEl = document.getElementById("lifetimePointsText");
-  const upPoints = document.getElementById("upgradePointsText");
-  if(pointsEl) pointsEl.textContent = Math.round(data.points).toLocaleString();
-  if(lifeEl) lifeEl.textContent = Math.round(data.lifetimePoints).toLocaleString();
-  if(upPoints) upPoints.textContent = Math.round(data.points).toLocaleString();
-
-  const pbar = document.getElementById("punishmentBar");
-  const ptext = document.getElementById("punishmentText");
-  const ppanel = document.getElementById("punishmentPanelText");
-  if(pbar){
-    pbar.max = 10;
-    pbar.value = (data.punishmentBar || 0) % 10;
-  }
-  const rolls = availablePunishmentRolls();
-  const pString = `${(data.punishmentBar||0).toFixed(1)} / 10 ${rolls ? `(${rolls} roll${rolls===1?"":"s"} available)` : ""}`;
-  if(ptext) ptext.textContent = pString;
-  if(ppanel) ppanel.textContent = pString;
-
-  renderUpgrades();
-  renderPunishments();
-
-  if(endGameActive()){
-    const rb = document.getElementById("rollAllBtn");
-    if(rb){
-      rb.disabled = true;
-      rb.textContent = "This is the end, you are free, no more rolls for you";
-    }
-  }
-}
-
-function renderUpgrades(){
-  const el = document.getElementById("upgradeList");
-  if(!el) return;
-  let html = UPGRADE_DEFS.map(u=>{
-    const lvl = data.upgrades?.[u.id] || 0;
-    const capped = lvl >= u.max;
-    const cost = upgradeCost(u.id);
-    return `<div class="upgrade-card">
-      <div>
-        <b>${esc(u.name)}</b>
-        <div class="muted">Level ${lvl} / ${u.max}</div>
-        <div class="muted">${esc(u.desc)}</div>
-      </div>
-      <button onclick="buyUpgrade('${u.id}')" ${capped || activeEffect("upgradesLocked") ? "disabled" : ""}>${capped ? "Maxed" : "Buy " + cost.toLocaleString()}</button>
-    </div>`;
-  }).join("");
-
-  if(isUpgradeCapReached()){
-    const cost = theEndCost();
-    html += `<div class="upgrade-card legendary-end">
-      <div>
-        <b>The End ?</b>
-        <div class="muted">Cost: ${cost.toLocaleString()} points</div>
-        <div class="muted">This is the final modifier.</div>
-      </div>
-      <button onclick="buyTheEnd()" ${data.theEndUnlocked ? "disabled" : ""}>${data.theEndUnlocked ? "Unlocked" : "Unlock"}</button>
-    </div>`;
-  }
-  el.innerHTML = html;
-}
-
-function renderPunishments(){
-  const activeEl = document.getElementById("activePunishmentsList");
-  if(activeEl){
-    activeEl.innerHTML = (data.activePunishments||[]).length ? data.activePunishments.map(p=>`
-      <div class="item">
-        <div><b>${esc(p.name)}</b><div class="muted">${p.days} day${p.days===1?"":"s"} remaining</div></div>
-      </div>
-    `).join("") : `<div class="muted">No active punishments.</div>`;
-  }
-
-  const wheel = document.getElementById("punishmentWheelList");
-  if(wheel){
-    const groups = ["Common","Uncommon","Rare","Epic","Legendary"];
-    wheel.innerHTML = groups.map(rarity => `
-      <div class="punish-rarity">
-        <h3>${rarity} <span class="muted">${RARITY_WEIGHTS[rarity]}%</span></h3>
-        ${PUNISHMENTS.filter(p=>p.rarity===rarity).map(p=>`
-          <div class="item"><div><b>${esc(p.name)}</b><div class="muted">${esc(p.desc)}</div></div></div>
-        `).join("")}
-      </div>
-    `).join("");
-  }
-}
-
-const rp = document.getElementById("rollPunishmentsBtn");
-if(rp) rp.onclick = rollAvailablePunishments;
-
-const da = document.getElementById("devAddPoints");
-if(da) da.onclick = () => {data.points += 1000; data.lifetimePoints += 1000; save(); render();};
-const dpb = document.getElementById("devPunishBar");
-if(dpb) dpb.onclick = () => {data.punishmentBar += 10; save(); render();};
-
-// Wrap existing render so V9 UI updates after old render.
-const baseRenderV9 = render;
-render = function(){
-  baseRenderV9();
-  renderV9();
-};
-
-processMissedDays();
-ensureV9Data();
-save();
-render();
-
-
-/* =========================
-   V10 Random Sissy Bimbo Day
-========================= */
-
-function localDateString(dateObj = new Date()){
-  const y = dateObj.getFullYear();
-  const m = String(dateObj.getMonth()+1).padStart(2,"0");
-  const d = String(dateObj.getDate()).padStart(2,"0");
-  return `${y}-${m}-${d}`;
-}
-
-function parseLocalDate(dateStr){
-  const [y,m,d] = dateStr.split("-").map(Number);
-  return new Date(y, m-1, d);
-}
-
-function formatDate(dateObj){
-  const y = dateObj.getFullYear();
-  const m = String(dateObj.getMonth()+1).padStart(2,"0");
-  const d = String(dateObj.getDate()).padStart(2,"0");
-  return `${y}-${m}-${d}`;
-}
-
-function seededRandom(seed){
-  // Small deterministic PRNG so every stored year is stable after generation.
-  let x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
-}
-
-function generateRSBDDatesForYear(year){
-  const start = new Date(year, 0, 1);
-  const end = new Date(year, 11, 31);
-  const daysInYear = Math.floor((end - start) / 86400000) + 1;
-  const segmentSize = daysInYear / 8;
-  const dates = [];
-
-  for(let i=0;i<8;i++){
-    const segStart = Math.floor(i * segmentSize);
-    const segEnd = Math.floor(((i+1) * segmentSize) - 1);
-    const seed = (year * 1000) + (i * 97) + 37 + Math.floor(Math.random()*1000000);
-    const offset = segStart + Math.floor(seededRandom(seed) * (segEnd - segStart + 1));
-    const date = new Date(year, 0, 1 + offset);
-    dates.push(formatDate(date));
-  }
-
-  return [...new Set(dates)].sort();
-}
-
-function ensureRSBDYear(year = new Date().getFullYear()){
-  data.rsbdYears ??= {};
-  if(!data.rsbdYears[year] || data.rsbdYears[year].length !== 8){
-    data.rsbdYears[year] = generateRSBDDatesForYear(Number(year));
-    save();
-  }
-  return data.rsbdYears[year];
-}
-
-function isRSBD(dateStr = localDateString()){
-  ensureRSBDYear(parseLocalDate(dateStr).getFullYear());
-  return data.forceRSBDToday && dateStr === localDateString()
-    ? true
-    : (data.rsbdYears?.[parseLocalDate(dateStr).getFullYear()] || []).includes(dateStr);
-}
-
-function datesBetweenExclusive(startStr, endStr){
-  const dates = [];
-  let d = parseLocalDate(startStr);
-  d.setDate(d.getDate() + 1);
-  const end = parseLocalDate(endStr);
-  while(d < end){
-    dates.push(formatDate(d));
-    d.setDate(d.getDate()+1);
-  }
-  return dates;
-}
-
-function adjudicatePreviousRolledDayIfNeeded(){
-  data.adjudicatedDates ??= {};
-  const r = data.todayResults;
-  if(!r || !r.date || data.adjudicatedDates[r.date]) return;
-  if(r.date === localDateString()) return;
-
-  const tasks = r.tasks || [];
-  const incomplete = tasks.filter(t => !t.complete).length;
-
-  if(incomplete > 0){
-    if(r.rsbd){
-      addPunishmentBar(incomplete);
-    } else {
-      addPunishmentBar(1);
-    }
-  }
-
-  data.adjudicatedDates[r.date] = true;
-  save();
-}
-
-function processSkippedRSBDSinceLastSeen(){
-  const t = localDateString();
-  if(!data.lastSeenDate){
-    data.lastSeenDate = t;
-    save();
-    return;
-  }
-
-  const missed = datesBetweenExclusive(data.lastSeenDate, t);
-  for(const dateStr of missed){
-    ensureRSBDYear(parseLocalDate(dateStr).getFullYear());
-    if(isRSBD(dateStr)){
-      addPunishmentBar(10);
-    }
-  }
-
-  data.lastSeenDate = t;
-  save();
-}
-
 function rsbdFillExactlySevenTasks(){
   const all = data.taskTags.flatMap(tag => tag.tasks.map(task => ({
-    key: tag.id + ":" + task.id,
-    tag: tag.name,
-    name: task.name,
-    probability: Number(task.probability)||0
+    key:tag.id+":"+task.id, tag:tag.name, name:task.name, probability:Number(task.probability)||0
   })));
-
   const results = [];
   const used = new Set();
-
   while(results.length < 7 && all.length){
-    let pool = all.filter(x => !used.has(x.key));
-    if(!pool.length){
-      // If the user has fewer than 7 tasks configured, allow repeats only after all unique tasks are used.
-      pool = all;
-    }
+    let pool = all.filter(x=>!used.has(x.key));
+    if(!pool.length) pool = all;
     const picked = pool[Math.floor(Math.random()*pool.length)];
     used.add(picked.key);
-    results.push({
-      id: uid(),
-      tag: picked.tag,
-      name: picked.name,
-      complete: false,
-      rsbd: true,
-      pointsBase: 100 - picked.probability
-    });
+    results.push({id:uid(), tag:picked.tag, name:picked.name, complete:false, rsbd:true, pointsBase:100-picked.probability});
   }
-
   return results;
 }
-
 function rollOutfits(forceAll=false){
   const rolledTags = [];
-
   for(const tag of data.outfitTags){
-    if(tag.items.length && (forceAll || chance(tag.probability))){
-      rolledTags.push(tag.id);
-    }
+    if(tag.items.length && (forceAll || chance(tag.probability))) rolledTags.push(tag.id);
   }
-
-  let bundles = rolledTags.map(tagId => buildOutfitBundle(tagId)).filter(bundle => bundle.length > 0);
+  let bundles = rolledTags.map(tagId => buildOutfitBundle(tagId)).filter(bundle=>bundle.length>0);
   bundles = resolveOutfitBundleConflicts(bundles);
-
   const finalTagIds = [];
   for(const bundle of bundles){
-    for(const tagId of bundle){
-      if(!finalTagIds.includes(tagId)) finalTagIds.push(tagId);
-    }
+    for(const tagId of bundle) if(!finalTagIds.includes(tagId)) finalTagIds.push(tagId);
   }
-
   const results = [];
   for(const tagId of finalTagIds){
     const tag = getOutfitTagById(tagId);
     if(!tag || !tag.items.length) continue;
     const item = tag.items[Math.floor(Math.random()*tag.items.length)];
-    results.push({tag: tag.name, name: item.name});
+    results.push({tag:tag.name, name:item.name});
   }
-
   return results;
 }
-
 function rollRoulette(force=false){
   const effective = data.roulette.base + data.roulette.cumTax;
   if(force || chance(effective)){
@@ -1326,8 +960,37 @@ function rollRoulette(force=false){
   return {triggered:false};
 }
 
-function rollAllV10(){
-  if(endGameActive()) return;
+function adjudicatePreviousRolledDayIfNeeded(){
+  data.adjudicatedDates ??= {};
+  const r = data.todayResults;
+  if(!r || !r.date || data.adjudicatedDates[r.date] || r.date === localDateString()) return;
+  const incomplete = (r.tasks || []).filter(t=>!t.complete).length;
+  if(incomplete > 0) addPunishmentBar(r.rsbd ? incomplete : 1);
+  data.adjudicatedDates[r.date] = true;
+}
+function processSkippedDays(){
+  const t = localDateString();
+  if(!data.lastSeenDate){
+    data.lastSeenDate = t;
+    return;
+  }
+  const last = parseLocalDate(data.lastSeenDate);
+  const now = parseLocalDate(t);
+  const diff = Math.floor((now-last)/86400000);
+  if(diff <= 0) return;
+  for(let i=1;i<=diff;i++){
+    const d = new Date(last);
+    d.setDate(d.getDate()+i);
+    const ds = formatDate(d);
+    decrementDailyEffects();
+    if(activeEffect("dailyPunishmentAdd")) addPunishmentBar(activeEffect("dailyPunishmentAdd"));
+    addPunishmentBar(isRSBD(ds) ? 10 : 3);
+  }
+  data.lastSeenDate = t;
+}
+
+function rollAllSystems(){
+  if(data.theEndUnlocked) return;
   const t = localDateString();
   if(data.lastRollDate === t) return alert("Today's Roll All has already been used.");
 
@@ -1357,7 +1020,6 @@ function rollAllV10(){
     const g = weightedRoll(data.games);
     gameResults.push(g ? g.name : "No game configured");
   }
-
   results.content = contentResults.join(" + ");
   results.game = gameResults.join(" + ");
   results.tasks = rsbd ? rsbdFillExactlySevenTasks() : rollTasks();
@@ -1371,27 +1033,39 @@ function rollAllV10(){
   save();
   render();
 
-  if(rsbd){
-    alert("✨ Random Sissy Bimbo Day ✨\nSpecial rules are active today.");
-  }
-
-  if(results.roulette.triggered && results.roulette.url){
-    window.open(results.roulette.url, "_blank");
-  }
+  if(rsbd) alert("✨ Random Sissy Bimbo Day ✨\nSpecial rules are active today.");
+  if(results.roulette.triggered && results.roulette.url) window.open(results.roulette.url, "_blank");
 }
 
-const rollBtnV10 = document.getElementById("rollAllBtn");
-if(rollBtnV10){
-  rollBtnV10.onclick = rollAllV10;
+function buyUpgrade(id){
+  if(activeEffect("upgradesLocked")) return alert("Upgrades are locked by punishment.");
+  const def = UPGRADE_DEFS.find(u=>u.id===id);
+  if(!def) return;
+  const lvl = data.upgrades[id] || 0;
+  if(lvl >= def.max) return;
+  const cost = upgradeCost(id);
+  if(data.points < cost) return alert("Not enough points.");
+  data.points -= cost;
+  data.upgrades[id] = lvl + 1;
+  save(); render();
 }
+window.buyUpgrade = buyUpgrade;
 
-// Override task completion for RSBD: no points and no reward.
+function buyTheEnd(){
+  if(!isUpgradeCapReached()) return;
+  const cost = theEndCost();
+  if(data.points < cost) return alert("Not enough points.");
+  data.points -= cost;
+  data.theEndUnlocked = true;
+  save(); render();
+}
+window.buyTheEnd = buyTheEnd;
+
 window.toggleTodayTask = (taskId,checked) => {
   const tasks = data.todayResults?.tasks || [];
   const task = tasks.find(x=>x.id===taskId);
   if(task) task.complete = checked;
   const allDone = tasks.length && tasks.every(x=>x.complete);
-
   if(allDone && data.rewardGrantedDate !== localDateString()){
     if(data.todayResults?.rsbd){
       data.rewardGrantedDate = localDateString();
@@ -1400,11 +1074,9 @@ window.toggleTodayTask = (taskId,checked) => {
       const earned = calculateTaskPoints(tasks);
       data.points += earned;
       data.lifetimePoints += Math.max(0, earned);
-
       if(data.reward.locked && !activeEffect("rewardFrozen")){
         data.reward.progress = Math.min(data.reward.target, data.reward.progress + 1);
       }
-
       data.rewardGrantedDate = localDateString();
       alert(`All tasks complete. You earned ${earned} points.` + (activeEffect("rewardFrozen") ? "\nReward progress is frozen by punishment." : ""));
     }
@@ -1412,50 +1084,115 @@ window.toggleTodayTask = (taskId,checked) => {
   save(); render();
 };
 
-function renderRSBD(){
-  ensureRSBDYear(new Date().getFullYear());
+function renderSystems(){
+  ensureSystemsData();
+
+  const pointsEl = document.getElementById("pointsText");
+  const lifeEl = document.getElementById("lifetimePointsText");
+  const upPoints = document.getElementById("upgradePointsText");
+  if(pointsEl) pointsEl.textContent = Math.round(data.points).toLocaleString();
+  if(lifeEl) lifeEl.textContent = Math.round(data.lifetimePoints).toLocaleString();
+  if(upPoints) upPoints.textContent = Math.round(data.points).toLocaleString();
+
+  const pbar = document.getElementById("punishmentBar");
+  const ptext = document.getElementById("punishmentText");
+  const ppanel = document.getElementById("punishmentPanelText");
+  if(pbar){ pbar.max = 10; pbar.value = (data.punishmentBar || 0) % 10; }
+  const rolls = availablePunishmentRolls();
+  const pString = `${(data.punishmentBar||0).toFixed(1)} / 10 ${rolls ? `(${rolls} roll${rolls===1?"":"s"} available)` : ""}`;
+  if(ptext) ptext.textContent = pString;
+  if(ppanel) ppanel.textContent = pString;
+
+  const upgradeList = document.getElementById("upgradeList");
+  if(upgradeList){
+    let html = UPGRADE_DEFS.map(u=>{
+      const lvl = data.upgrades?.[u.id] || 0;
+      const capped = lvl >= u.max;
+      const cost = upgradeCost(u.id);
+      return `<div class="upgrade-card">
+        <div>
+          <b>${esc(u.name)}</b>
+          <div class="muted">Level ${lvl} / ${u.max}</div>
+          <div class="muted">${esc(u.desc)}</div>
+        </div>
+        <button onclick="buyUpgrade('${u.id}')" ${capped || activeEffect("upgradesLocked") ? "disabled" : ""}>${capped ? "Maxed" : "Buy " + cost.toLocaleString()}</button>
+      </div>`;
+    }).join("");
+    if(isUpgradeCapReached()){
+      const cost = theEndCost();
+      html += `<div class="upgrade-card legendary-end">
+        <div><b>The End ?</b><div class="muted">Cost: ${cost.toLocaleString()} points</div></div>
+        <button onclick="buyTheEnd()" ${data.theEndUnlocked ? "disabled" : ""}>${data.theEndUnlocked ? "Unlocked" : "Unlock"}</button>
+      </div>`;
+    }
+    upgradeList.innerHTML = html;
+  }
+
+  const activeEl = document.getElementById("activePunishmentsList");
+  if(activeEl){
+    activeEl.innerHTML = (data.activePunishments||[]).length ? data.activePunishments.map(p=>`
+      <div class="item"><div><b>${esc(p.name)}</b><div class="muted">${p.days} day${p.days===1?"":"s"} remaining</div></div></div>
+    `).join("") : `<div class="muted">No active punishments.</div>`;
+  }
+
+  const wheel = document.getElementById("punishmentWheelList");
+  if(wheel){
+    wheel.innerHTML = ["Common","Uncommon","Rare","Epic","Legendary"].map(rarity=>`
+      <div class="punish-rarity">
+        <h3>${rarity} <span class="muted">${RARITY_WEIGHTS[rarity]}%</span></h3>
+        ${PUNISHMENTS.filter(p=>p.rarity===rarity).map(p=>`
+          <div class="item"><div><b>${esc(p.name)}</b><div class="muted">${esc(p.desc)}</div></div></div>
+        `).join("")}
+      </div>
+    `).join("");
+  }
+
   const banner = document.getElementById("rsbdBanner");
   if(banner) banner.classList.toggle("hidden", !isRSBD(localDateString()));
 
-  if(data.todayResults?.rsbd){
-    const results = document.getElementById("results");
-    if(results && !results.classList.contains("hidden")){
-      if(!results.querySelector(".rsbd-result-note")){
-        results.insertAdjacentHTML("afterbegin", `<div class="rsbd-result-note">✨ Random Sissy Bimbo Day: 100% Chastity, 100% Roulette, all outfits forced, exactly 7 tasks, no points/reward.</div>`);
-      }
-    }
+  const rollButton = document.getElementById("rollAllBtn");
+  if(rollButton && data.theEndUnlocked){
+    rollButton.disabled = true;
+    rollButton.textContent = "This is the end, you are free, no more rolls for you";
   }
 }
 
-// Patch old render wrapper again.
-const renderBeforeRSBD = render;
+const originalRender = render;
 render = function(){
-  renderBeforeRSBD();
-  renderRSBD();
+  originalRender();
+  renderSystems();
 };
 
-// Dev tools
-const devForceRSBD = document.getElementById("devForceRSBD");
-if(devForceRSBD){
-  devForceRSBD.onclick = () => {
+function bindSystemsButtons(){
+  const rb = document.getElementById("rollAllBtn");
+  if(rb) rb.onclick = rollAllSystems;
+  const ct = document.getElementById("cumTaxBtn");
+  if(ct) ct.onclick = () => {data.roulette.cumTax += taxIncreaseAmount(); save(); render();};
+  const rp = document.getElementById("rollPunishmentsBtn");
+  if(rp) rp.onclick = rollAvailablePunishments;
+
+  const da = document.getElementById("devAddPoints");
+  if(da) da.onclick = () => {data.points += 1000; data.lifetimePoints += 1000; save(); render();};
+  const dpb = document.getElementById("devPunishBar");
+  if(dpb) dpb.onclick = () => {data.punishmentBar += 10; save(); render();};
+  const devForceRSBD = document.getElementById("devForceRSBD");
+  if(devForceRSBD) devForceRSBD.onclick = () => {
     data.forceRSBDToday = !data.forceRSBDToday;
     save(); render();
     alert("Force RSBD Today: " + (data.forceRSBDToday ? "ON" : "OFF"));
   };
-}
-const devShowRSBD = document.getElementById("devShowRSBD");
-if(devShowRSBD){
-  devShowRSBD.onclick = () => {
+  const devShowRSBD = document.getElementById("devShowRSBD");
+  if(devShowRSBD) devShowRSBD.onclick = () => {
     const year = new Date().getFullYear();
     const dates = ensureRSBDYear(year);
     alert(`RSBD dates for ${year}:\n` + dates.join("\n"));
   };
 }
 
-// Initial yearly generation/adjudication.
-// Generates the full current year even if today is mid-year.
+ensureSystemsData();
 ensureRSBDYear(new Date().getFullYear());
 adjudicatePreviousRolledDayIfNeeded();
-processSkippedRSBDSinceLastSeen();
+processSkippedDays();
+bindSystemsButtons();
 save();
 render();
