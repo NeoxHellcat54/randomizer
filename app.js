@@ -671,7 +671,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=11").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=13").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -1209,3 +1209,35 @@ processSkippedDays();
 bindSystemsButtons();
 save();
 render();
+
+
+/* V13 compatibility: missing base renderResults */
+function renderResults(){
+  const resultsEl = document.getElementById("results");
+  if(!resultsEl) return;
+
+  if(!data.todayResults){
+    resultsEl.classList.add("hidden");
+    resultsEl.innerHTML = "";
+    return;
+  }
+
+  const r = data.todayResults;
+  resultsEl.classList.remove("hidden");
+
+  const taskLines = (r.tasks || []).map(t => `${esc(t.tag)} — ${esc(t.name)}${t.complete ? " ✓" : ""}`).join("<br>") || "No tasks";
+  const outfitLines = (r.outfits || []).map(o => `${esc(o.tag)} — ${esc(o.name)}`).join("<br>") || "No outfit items";
+
+  resultsEl.innerHTML = `
+    <h2>Today's Results</h2>
+    ${r.rsbd ? `<div class="rsbd-result-note">✨ Random Sissy Bimbo Day: 100% Chastity, 100% Roulette, all outfits forced, exactly 7 tasks, no points/reward.</div>` : ""}
+    <div class="result-grid">
+      <div class="result-box"><h4>Chastity</h4><p>${esc(r.chastity?.result || "")}${r.chastity?.cage ? " — " + esc(r.chastity.cage) : ""}</p></div>
+      <div class="result-box"><h4>Content</h4><p>${esc(r.content || "No content configured")}</p></div>
+      <div class="result-box"><h4>Game</h4><p>${esc(r.game || "No game configured")}</p></div>
+      <div class="result-box"><h4>Tasks</h4><p>${taskLines}</p></div>
+      <div class="result-box"><h4>Outfits</h4><p>${outfitLines}</p></div>
+      <div class="result-box"><h4>Roulette</h4><p>${r.roulette?.triggered ? "Triggered — " + esc(r.roulette.name) : "No trigger"}</p></div>
+    </div>
+  `;
+}
