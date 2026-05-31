@@ -1,1 +1,9 @@
-{"name":"Sissy Random","short_name":"Sissy","start_url":"./","display":"standalone","theme_color":"#ff8ec2","background_color":"#fff5fa"}
+{
+  "name": "Sissy Random",
+  "short_name": "SissyRandom",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#fff5fa",
+  "theme_color": "#ff7eb6",
+  "icons": []
+}
