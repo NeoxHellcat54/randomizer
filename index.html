@@ -6,7 +6,7 @@
   <title>Sissy Random</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=8" />
+  <link rel="stylesheet" href="styles.css?v=9" />
 </head>
 <body>
   <div class="bg-orb orb-a"></div>
@@ -49,6 +49,24 @@
         <button id="rollAllBtn" class="roll">Roll All</button>
         <div id="rollStatus" class="status"></div>
       </section>
+
+      <section class="points-summary compact-card">
+        <div class="row">
+          <div>
+            <span class="tiny">Points</span>
+            <h2 id="pointsText">0</h2>
+          </div>
+          <div>
+            <span class="tiny">Lifetime</span>
+            <h2 id="lifetimePointsText">0</h2>
+          </div>
+        </div>
+        <div class="bar-wrap">
+          <span class="tiny">Punishment Bar</span>
+          <progress id="punishmentBar" value="0" max="10"></progress>
+          <div id="punishmentText" class="progress-text">0 / 10</div>
+        </div>
+      </section>
     </header>
 
     <section id="devPanel" class="dev-panel hidden">
@@ -69,6 +87,8 @@
         <button id="devRouletteBasePlus">Roulette Base +0.5%</button>
         <button id="devRouletteBaseMinus">Roulette Base -0.5%</button>
         <button id="devForceReroll">Force Reroll All</button>
+        <button id="devAddPoints">+1000 Points</button>
+        <button id="devPunishBar">+10 Punishment Bar</button>
         <button id="devForceDressSkirtTest">Test Outfit Rules</button>
       </div>
     </section>
@@ -82,6 +102,8 @@
       <button class="tab" data-tab="roulette">Roulette</button>
       <button class="tab" data-tab="tasks">Tasks</button>
       <button class="tab" data-tab="outfits">Outfits</button>
+      <button class="tab" data-tab="upgrades">Upgrades</button>
+      <button class="tab" data-tab="punishments">Punishments</button>
     </nav>
 
     <main class="screen">
@@ -181,10 +203,36 @@
           <div id="outfitTags" class="tag-list"></div>
         </details>
       </section>
+
+      <section id="upgrades" class="panel hidden">
+        <div class="screen-head">
+          <div><span class="tiny">Progression</span><h2>Upgrades</h2></div>
+          <div class="pill">Points: <span id="upgradePointsText">0</span></div>
+        </div>
+        <div id="upgradeList" class="upgrade-list"></div>
+      </section>
+
+      <section id="punishments" class="panel hidden">
+        <div class="screen-head">
+          <div><span class="tiny">Consequences</span><h2>Punishments</h2></div>
+          <div class="pill">Bar: <span id="punishmentPanelText">0</span></div>
+        </div>
+        <div class="button-row">
+          <button id="rollPunishmentsBtn">Roll Available Punishments</button>
+        </div>
+        <div class="inner-note">
+          Every rolled day with incomplete tasks adds +1. Every skipped day adds +3. Each 10 bar gives 1 punishment roll.
+        </div>
+        <h3>Active Punishments</h3>
+        <div id="activePunishmentsList" class="list"></div>
+        <h3>Punishment Wheel</h3>
+        <div id="punishmentWheelList" class="list"></div>
+      </section>
+
     </main>
   </div>
 
   <div id="updateToast" class="update-toast hidden">Update ready. Refreshing…</div>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>

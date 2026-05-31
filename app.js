@@ -21,7 +21,16 @@ const defaults = {
   },
   lastRollDate: null,
   rewardGrantedDate: null,
-  todayResults: null
+  todayResults: null,
+  points: 0,
+  lifetimePoints: 0,
+  upgrades: {},
+  punishmentBar: 0,
+  activePunishments: [],
+  punishmentCostMultiplier: 1,
+  theEndCostBonus: 0,
+  theEndUnlocked: false,
+  lastSeenDate: null
 };
 
 let data = load();
@@ -645,7 +654,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=8").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=9").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -671,3 +680,454 @@ if(devDressSkirtBtn){
     alert("Outfit rule test: create tags Dress, Skirt, Top. Set Dress incompatible with Skirt. Set Skirt required tags to Top. Then use Force Reroll All or high probabilities to test Dress vs Skirt+Top.");
   };
 }
+
+
+/* =========================
+   V9 Points, Upgrades, Punishments, Task Cap
+========================= */
+
+const UPGRADE_DEFS = [
+  {id:"taxCut", name:"Tax Cut", max:99, desc:"Cum Tax increase amount -0.01% per level."},
+  {id:"chastityControl", name:"Chastity Control", max:99, desc:"Chastity NO increase amount -0.01% per level."},
+  {id:"contentDouble", name:"Content Double Roll", max:100, desc:"1% chance per level to roll Content twice."},
+  {id:"gameDouble", name:"Game Double Roll", max:100, desc:"1% chance per level to roll Game twice."},
+  {id:"taskOverflow", name:"Task Overflow", max:100, desc:"3% chance per level for extra minimum tasks. Overflow ignores tags. Daily cap remains 5."},
+  {id:"pointMultiplier", name:"Point Multiplier", max:100, desc:"+1.5% points earned per level."}
+];
+
+const PUNISHMENTS = [
+  {id:"pointDrain", rarity:"Common", name:"Point Drain", desc:"Lose 10% current points.", apply:()=>{data.points -= Math.ceil(Math.abs(data.points) * 0.10);}},
+  {id:"rewardLoss", rarity:"Common", name:"Reward Loss", desc:"Lose 2 reward progress.", apply:()=>{data.reward.progress = Math.max(0,(data.reward.progress||0)-2);}},
+  {id:"pointTax", rarity:"Common", name:"Point Tax", desc:"-25% points earned for 30 days.", apply:()=>addTempPunishment("pointTax", "Point Tax", 30, {pointGainMult:0.75})},
+  {id:"taskSurge", rarity:"Common", name:"Task Surge", desc:"+2 minimum tasks for 10 days.", apply:()=>addTempPunishment("taskSurge", "Task Surge", 10, {minTasksAdd:2})},
+
+  {id:"rewardFreeze", rarity:"Uncommon", name:"Reward Freeze", desc:"Reward progress cannot increase for 10 days.", apply:()=>addTempPunishment("rewardFreeze", "Reward Freeze", 10, {rewardFrozen:true})},
+  {id:"upgradeLock", rarity:"Uncommon", name:"Upgrade Lock", desc:"Cannot purchase upgrades for 10 days.", apply:()=>addTempPunishment("upgradeLock", "Upgrade Lock", 10, {upgradesLocked:true})},
+  {id:"cumTaxX3", rarity:"Uncommon", name:"Cum Tax Increase x3", desc:"Cum Tax increase amount x3 for 10 days.", apply:()=>addTempPunishment("cumTaxX3", "Cum Tax Increase x3", 10, {cumTaxMult:3})},
+  {id:"chastityX3", rarity:"Uncommon", name:"Chastity Increase x3", desc:"Chastity NO increase amount x3 for 10 days.", apply:()=>addTempPunishment("chastityX3", "Chastity Increase x3", 10, {chastityIncMult:3})},
+
+  {id:"disableMods", rarity:"Rare", name:"Disable Modifiers", desc:"All upgrade effects disabled for 10 days.", apply:()=>addTempPunishment("disableMods", "Disable Modifiers", 10, {disableModifiers:true})},
+  {id:"severePointTax", rarity:"Rare", name:"Severe Point Tax", desc:"-75% points earned for 10 days.", apply:()=>addTempPunishment("severePointTax", "Severe Point Tax", 10, {pointGainMult:0.25})},
+  {id:"rewardInflation", rarity:"Rare", name:"Reward Inflation", desc:"Current reward target +5 days.", apply:()=>{if(data.reward?.target) data.reward.target += 5;}},
+  {id:"dailyDebt", rarity:"Rare", name:"Daily Debt", desc:"+1 punishment bar every day for 10 days.", apply:()=>addTempPunishment("dailyDebt", "Daily Debt", 10, {dailyPunishmentAdd:1})},
+
+  {id:"chastityBase", rarity:"Epic", name:"Chastity Base +10%", desc:"Permanent +10% chastity probability.", apply:()=>{data.chastityProbability += 10;}},
+  {id:"costIncrease", rarity:"Epic", name:"Upgrade Costs +2%", desc:"Permanent upgrade costs +2%.", apply:()=>{data.punishmentCostMultiplier = (data.punishmentCostMultiplier||1) * 1.02;}},
+  {id:"rouletteBase", rarity:"Epic", name:"Roulette Base +1%", desc:"Permanent roulette base +1%.", apply:()=>{data.roulette.base = Number(data.roulette.base||0)+1;}},
+  {id:"modifierCorruption", rarity:"Epic", name:"Modifier Corruption", desc:"Random upgrade loses 5 levels.", apply:()=>corruptRandomUpgrade()},
+
+  {id:"falseFreedom", rarity:"Legendary", name:"False Freedom", desc:"The End ? cost +100,000.", apply:()=>{data.theEndCostBonus = (data.theEndCostBonus||0)+100000;}},
+  {id:"regression", rarity:"Legendary", name:"Regression", desc:"Lose 5% of lifetime points earned. Can go negative.", apply:()=>{data.points -= Math.ceil((data.lifetimePoints||0)*0.05);}},
+  {id:"debtSpiral", rarity:"Legendary", name:"Debt Spiral", desc:"Punishment bar +25 immediately.", apply:()=>{data.punishmentBar = (data.punishmentBar||0)+25;}},
+  {id:"eternalBurden", rarity:"Legendary", name:"Eternal Burden", desc:"All future punishment bar gains increased by 25%.", apply:()=>{data.punishmentBurdenMult = (data.punishmentBurdenMult||1)*1.25;}}
+];
+
+const RARITY_WEIGHTS = {Common:50, Uncommon:30, Rare:12, Epic:6, Legendary:2};
+
+function ensureV9Data(){
+  data.points ??= 0;
+  data.lifetimePoints ??= 0;
+  data.upgrades ??= {};
+  data.punishmentBar ??= 0;
+  data.activePunishments ??= [];
+  data.punishmentCostMultiplier ??= 1;
+  data.theEndCostBonus ??= 0;
+  data.theEndUnlocked ??= false;
+  data.punishmentBurdenMult ??= 1;
+  for(const u of UPGRADE_DEFS) data.upgrades[u.id] ??= 0;
+}
+
+function effectiveModifiersDisabled(){
+  return activeEffect("disableModifiers") ? true : false;
+}
+function upgradeLevel(id){
+  if(effectiveModifiersDisabled()) return 0;
+  return Number(data.upgrades?.[id] || 0);
+}
+function upgradeCost(id){
+  const lvl = Number(data.upgrades?.[id] || 0);
+  return Math.ceil((100 + (4 * lvl)) * (data.punishmentCostMultiplier || 1));
+}
+function isUpgradeCapReached(){
+  return UPGRADE_DEFS.every(u => (data.upgrades?.[u.id] || 0) >= u.max);
+}
+function theEndCost(){
+  return 1000000 + (data.theEndCostBonus || 0);
+}
+function activeEffect(key){
+  for(const p of data.activePunishments || []){
+    if(p.effects && p.effects[key]) return p.effects[key];
+  }
+  return null;
+}
+function combinedEffectMult(key, fallback=1){
+  let mult = fallback;
+  for(const p of data.activePunishments || []){
+    if(p.effects && typeof p.effects[key] === "number") mult *= p.effects[key];
+  }
+  return mult;
+}
+function addTempPunishment(id, name, days, effects){
+  const existing = data.activePunishments.find(p => p.id === id);
+  if(existing){
+    existing.days += days;
+  } else {
+    data.activePunishments.push({id,name,days,effects});
+  }
+}
+function corruptRandomUpgrade(){
+  const possible = UPGRADE_DEFS.filter(u => (data.upgrades?.[u.id] || 0) > 0);
+  if(!possible.length) return;
+  const picked = possible[Math.floor(Math.random()*possible.length)];
+  data.upgrades[picked.id] = Math.max(0, (data.upgrades[picked.id]||0)-5);
+}
+function addPunishmentBar(amount){
+  data.punishmentBar = (data.punishmentBar || 0) + (amount * (data.punishmentBurdenMult || 1));
+}
+function availablePunishmentRolls(){
+  return Math.floor((data.punishmentBar || 0) / 10);
+}
+function rollRarity(){
+  const entries = Object.entries(RARITY_WEIGHTS);
+  const total = entries.reduce((s,[,w])=>s+w,0);
+  let r = Math.random()*total;
+  for(const [rarity, weight] of entries){
+    r -= weight;
+    if(r <= 0) return rarity;
+  }
+  return "Common";
+}
+function rollOnePunishment(){
+  const rarity = rollRarity();
+  const pool = PUNISHMENTS.filter(p=>p.rarity===rarity);
+  const picked = pool[Math.floor(Math.random()*pool.length)];
+  picked.apply();
+  return picked;
+}
+function rollAvailablePunishments(){
+  const rolls = availablePunishmentRolls();
+  if(!rolls) return alert("No punishment rolls available yet.");
+  const results = [];
+  for(let i=0;i<rolls;i++) results.push(rollOnePunishment());
+  data.punishmentBar = (data.punishmentBar || 0) % 10;
+  save(); render();
+  alert("Punishments rolled:\n" + results.map(p=>`${p.rarity}: ${p.name}`).join("\n"));
+}
+
+function decrementDailyEffects(){
+  for(const p of data.activePunishments || []) p.days -= 1;
+  data.activePunishments = (data.activePunishments || []).filter(p=>p.days > 0);
+}
+
+function processMissedDays(){
+  ensureV9Data();
+  const t = today();
+  if(!data.lastSeenDate){
+    data.lastSeenDate = t;
+    save();
+    return;
+  }
+  const last = new Date(data.lastSeenDate + "T00:00:00");
+  const now = new Date(t + "T00:00:00");
+  const diff = Math.floor((now - last) / 86400000);
+  if(diff <= 0) return;
+
+  for(let i=0;i<diff;i++){
+    decrementDailyEffects();
+    if(activeEffect("dailyPunishmentAdd")) addPunishmentBar(activeEffect("dailyPunishmentAdd"));
+  }
+
+  // For each skipped calendar day where no roll was recorded, add +3.
+  // Conservative: if the previous seen day was also lastRollDate, only days after that count as skipped.
+  addPunishmentBar(3 * diff);
+  data.lastSeenDate = t;
+  save();
+}
+
+function endGameActive(){
+  return data.theEndUnlocked === true;
+}
+
+function capTasks(tasks){
+  const out = [...tasks];
+  while(out.length > 5){
+    out.splice(Math.floor(Math.random()*out.length), 1);
+  }
+  return out;
+}
+
+function taskOverflowMinimum(){
+  const lvl = upgradeLevel("taskOverflow");
+  const raw = lvl * 3; // percent
+  const guaranteed = Math.floor(raw / 100);
+  const chancePart = raw % 100;
+  let extra = guaranteed;
+  if(Math.random()*100 < chancePart) extra += 1;
+  return 1 + extra + Number(activeEffect("minTasksAdd") || 0);
+}
+
+function fillMinimumTasks(tasks){
+  const minTasks = Math.min(5, taskOverflowMinimum());
+  const out = [...tasks];
+  const all = data.taskTags.flatMap(tag => tag.tasks.map(task => ({
+    tag: tag.name, name: task.name, probability: Number(task.probability)||0
+  })));
+  while(out.length < minTasks && all.length){
+    const picked = all[Math.floor(Math.random()*all.length)];
+    out.push({id:uid(), tag:picked.tag, name:picked.name, complete:false, overflow:true, pointsBase:100-picked.probability});
+  }
+  return capTasks(out);
+}
+
+/* Override core roll functions */
+function rollTasks(){
+  const results = [];
+  for(const tag of data.taskTags){
+    const hits = tag.tasks.filter(task => chance(task.probability));
+    if(hits.length){
+      const picked = hits[Math.floor(Math.random()*hits.length)];
+      results.push({id:uid(), tag:tag.name, name:picked.name, complete:false, pointsBase:100-(Number(picked.probability)||0)});
+    }
+  }
+  if(!results.length){
+    const all = data.taskTags.flatMap(tag => tag.tasks.map(task => ({tag:tag.name, name:task.name, probability:Number(task.probability)||0})));
+    if(all.length){
+      const picked = all[Math.floor(Math.random()*all.length)];
+      results.push({id:uid(), tag:picked.tag, name:picked.name, complete:false, failsafe:true, pointsBase:100-picked.probability});
+    }
+  }
+  return fillMinimumTasks(results);
+}
+
+function calculateTaskPoints(tasks){
+  const base = tasks.reduce((s,t)=>s + Number(t.pointsBase ?? 75), 0);
+  const pointUpgradeMult = 1 + (upgradeLevel("pointMultiplier") * 0.015);
+  const punishmentMult = combinedEffectMult("pointGainMult", 1);
+  return Math.round(base * pointUpgradeMult * punishmentMult);
+}
+
+function taxIncreaseAmount(){
+  const base = Math.max(0.01, 1 - (upgradeLevel("taxCut") * 0.01));
+  return base * combinedEffectMult("cumTaxMult", 1);
+}
+function chastityIncreaseAmount(){
+  const base = Math.max(0.01, 1 - (upgradeLevel("chastityControl") * 0.01));
+  return base * combinedEffectMult("chastityIncMult", 1);
+}
+
+const oldCumTaxBtn = document.getElementById("cumTaxBtn");
+if(oldCumTaxBtn){
+  oldCumTaxBtn.onclick = () => {
+    data.roulette.cumTax += taxIncreaseAmount();
+    save(); render();
+  };
+}
+
+const rollBtn = document.getElementById("rollAllBtn");
+if(rollBtn){
+  rollBtn.onclick = () => {
+    if(endGameActive()) return;
+    const t = today();
+    if(data.lastRollDate === t) return alert("Today's Roll All has already been used.");
+
+    const results = {};
+    const chastityYes = chance(data.chastityProbability);
+    results.chastity = {result: chastityYes ? "YES" : "NO", cage: null};
+    if(chastityYes){
+      const cage = weightedRoll(data.cages);
+      results.chastity.cage = cage ? cage.name : "No cage configured";
+    } else {
+      data.chastityProbability += chastityIncreaseAmount();
+    }
+
+    const contentRolls = chance(upgradeLevel("contentDouble")) ? 2 : 1;
+    const gameRolls = chance(upgradeLevel("gameDouble")) ? 2 : 1;
+    const contentResults = [];
+    const gameResults = [];
+    for(let i=0;i<contentRolls;i++){
+      const c = weightedRoll(data.content);
+      contentResults.push(c ? c.name : "No content configured");
+    }
+    for(let i=0;i<gameRolls;i++){
+      const g = weightedRoll(data.games);
+      gameResults.push(g ? g.name : "No game configured");
+    }
+    results.content = contentResults.join(" + ");
+    results.game = gameResults.join(" + ");
+
+    results.tasks = rollTasks();
+    results.outfits = rollOutfits();
+    results.roulette = rollRoulette();
+
+    data.lastRollDate = t;
+    data.lastSeenDate = t;
+    data.rewardGrantedDate = null;
+    data.todayResults = results;
+    save();
+    render();
+
+    if(results.roulette.triggered && results.roulette.url){
+      window.open(results.roulette.url, "_blank");
+    }
+  };
+}
+
+function checkYesterdayFailureBeforeNewRoll(){
+  // Reserved for future stricter calendar tracking.
+}
+
+/* Override task complete handler */
+window.toggleTodayTask = (taskId,checked) => {
+  const tasks = data.todayResults?.tasks || [];
+  const task = tasks.find(x=>x.id===taskId);
+  if(task) task.complete = checked;
+  const allDone = tasks.length && tasks.every(x=>x.complete);
+
+  if(allDone && data.rewardGrantedDate !== today()){
+    const earned = calculateTaskPoints(tasks);
+    data.points += earned;
+    data.lifetimePoints += Math.max(0, earned);
+
+    if(data.reward.locked && !activeEffect("rewardFrozen")){
+      data.reward.progress = Math.min(data.reward.target, data.reward.progress + 1);
+    }
+
+    data.rewardGrantedDate = today();
+    alert(`All tasks complete. You earned ${earned} points.` + (activeEffect("rewardFrozen") ? "\nReward progress is frozen by punishment." : ""));
+  }
+  save(); render();
+};
+
+function buyUpgrade(id){
+  ensureV9Data();
+  if(activeEffect("upgradesLocked")) return alert("Upgrades are locked by punishment.");
+  const def = UPGRADE_DEFS.find(u=>u.id===id);
+  if(!def) return;
+  const lvl = data.upgrades[id] || 0;
+  if(lvl >= def.max) return;
+  const cost = upgradeCost(id);
+  if(data.points < cost) return alert("Not enough points.");
+  data.points -= cost;
+  data.upgrades[id] = lvl + 1;
+  save(); render();
+}
+window.buyUpgrade = buyUpgrade;
+
+function buyTheEnd(){
+  if(!isUpgradeCapReached()) return;
+  const cost = theEndCost();
+  if(data.points < cost) return alert("Not enough points.");
+  data.points -= cost;
+  data.theEndUnlocked = true;
+  save(); render();
+}
+window.buyTheEnd = buyTheEnd;
+
+function renderV9(){
+  ensureV9Data();
+
+  const pointsEl = document.getElementById("pointsText");
+  const lifeEl = document.getElementById("lifetimePointsText");
+  const upPoints = document.getElementById("upgradePointsText");
+  if(pointsEl) pointsEl.textContent = Math.round(data.points).toLocaleString();
+  if(lifeEl) lifeEl.textContent = Math.round(data.lifetimePoints).toLocaleString();
+  if(upPoints) upPoints.textContent = Math.round(data.points).toLocaleString();
+
+  const pbar = document.getElementById("punishmentBar");
+  const ptext = document.getElementById("punishmentText");
+  const ppanel = document.getElementById("punishmentPanelText");
+  if(pbar){
+    pbar.max = 10;
+    pbar.value = (data.punishmentBar || 0) % 10;
+  }
+  const rolls = availablePunishmentRolls();
+  const pString = `${(data.punishmentBar||0).toFixed(1)} / 10 ${rolls ? `(${rolls} roll${rolls===1?"":"s"} available)` : ""}`;
+  if(ptext) ptext.textContent = pString;
+  if(ppanel) ppanel.textContent = pString;
+
+  renderUpgrades();
+  renderPunishments();
+
+  if(endGameActive()){
+    const rb = document.getElementById("rollAllBtn");
+    if(rb){
+      rb.disabled = true;
+      rb.textContent = "This is the end, you are free, no more rolls for you";
+    }
+  }
+}
+
+function renderUpgrades(){
+  const el = document.getElementById("upgradeList");
+  if(!el) return;
+  let html = UPGRADE_DEFS.map(u=>{
+    const lvl = data.upgrades?.[u.id] || 0;
+    const capped = lvl >= u.max;
+    const cost = upgradeCost(u.id);
+    return `<div class="upgrade-card">
+      <div>
+        <b>${esc(u.name)}</b>
+        <div class="muted">Level ${lvl} / ${u.max}</div>
+        <div class="muted">${esc(u.desc)}</div>
+      </div>
+      <button onclick="buyUpgrade('${u.id}')" ${capped || activeEffect("upgradesLocked") ? "disabled" : ""}>${capped ? "Maxed" : "Buy " + cost.toLocaleString()}</button>
+    </div>`;
+  }).join("");
+
+  if(isUpgradeCapReached()){
+    const cost = theEndCost();
+    html += `<div class="upgrade-card legendary-end">
+      <div>
+        <b>The End ?</b>
+        <div class="muted">Cost: ${cost.toLocaleString()} points</div>
+        <div class="muted">This is the final modifier.</div>
+      </div>
+      <button onclick="buyTheEnd()" ${data.theEndUnlocked ? "disabled" : ""}>${data.theEndUnlocked ? "Unlocked" : "Unlock"}</button>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderPunishments(){
+  const activeEl = document.getElementById("activePunishmentsList");
+  if(activeEl){
+    activeEl.innerHTML = (data.activePunishments||[]).length ? data.activePunishments.map(p=>`
+      <div class="item">
+        <div><b>${esc(p.name)}</b><div class="muted">${p.days} day${p.days===1?"":"s"} remaining</div></div>
+      </div>
+    `).join("") : `<div class="muted">No active punishments.</div>`;
+  }
+
+  const wheel = document.getElementById("punishmentWheelList");
+  if(wheel){
+    const groups = ["Common","Uncommon","Rare","Epic","Legendary"];
+    wheel.innerHTML = groups.map(rarity => `
+      <div class="punish-rarity">
+        <h3>${rarity} <span class="muted">${RARITY_WEIGHTS[rarity]}%</span></h3>
+        ${PUNISHMENTS.filter(p=>p.rarity===rarity).map(p=>`
+          <div class="item"><div><b>${esc(p.name)}</b><div class="muted">${esc(p.desc)}</div></div></div>
+        `).join("")}
+      </div>
+    `).join("");
+  }
+}
+
+const rp = document.getElementById("rollPunishmentsBtn");
+if(rp) rp.onclick = rollAvailablePunishments;
+
+const da = document.getElementById("devAddPoints");
+if(da) da.onclick = () => {data.points += 1000; data.lifetimePoints += 1000; save(); render();};
+const dpb = document.getElementById("devPunishBar");
+if(dpb) dpb.onclick = () => {data.punishmentBar += 10; save(); render();};
+
+// Wrap existing render so V9 UI updates after old render.
+const baseRenderV9 = render;
+render = function(){
+  baseRenderV9();
+  renderV9();
+};
+
+processMissedDays();
+ensureV9Data();
+save();
+render();
