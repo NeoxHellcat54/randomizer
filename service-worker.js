@@ -1,7 +1,7 @@
-const CACHE = "sissy-random-v5";
+const CACHE = "sissy-random-v8";
 const ASSETS = [
-  "./styles.css?v=5",
-  "./app.js?v=5",
+  "./styles.css?v=8",
+  "./app.js?v=8",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
@@ -29,7 +29,6 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   const req = event.request;
 
-  // Always try network first for page navigations so F5 gets fresh HTML.
   if (req.mode === "navigate") {
     event.respondWith(
       fetch(req)
@@ -43,7 +42,6 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  // Cache-first for static versioned assets.
   event.respondWith(
     caches.match(req).then(cached => {
       if (cached) return cached;

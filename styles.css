@@ -187,3 +187,86 @@ input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(255,120,186,.12)}
   body{overscroll-behavior-y:contain}
   .tabs{top:env(safe-area-inset-top)}
 }
+
+
+/* V6 outfit rule UI */
+.hint{
+  margin:8px 0 0;
+  color:var(--muted);
+  font-size:.86rem;
+  line-height:1.35;
+}
+.outfit-rule-item{
+  align-items:flex-start;
+}
+.outfit-rule-main{
+  display:grid;
+  gap:8px;
+  flex:1;
+}
+.rule-label{
+  display:grid;
+  gap:4px;
+  color:var(--muted);
+  font-size:.78rem;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.rule-label input{
+  width:100%;
+  flex:1 1 auto;
+  font-size:.92rem;
+  text-transform:none;
+  letter-spacing:normal;
+  font-weight:500;
+  color:var(--text);
+}
+.outfit-add{
+  margin-top:10px;
+}
+
+
+/* V7 tag-level outfit rules */
+.rule-box{
+  display:grid;
+  gap:8px;
+  margin:10px 0;
+  padding:10px;
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:rgba(255,255,255,.55);
+}
+.outfit-tag-head{
+  align-items:flex-start;
+}
+.hint{
+  margin:8px 0 0;
+  color:var(--muted);
+  font-size:.86rem;
+  line-height:1.35;
+}
+.rule-label{
+  display:grid;
+  gap:4px;
+  color:var(--muted);
+  font-size:.78rem;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.rule-label input{
+  width:100%;
+  flex:1 1 auto;
+  font-size:.92rem;
+  text-transform:none;
+  letter-spacing:normal;
+  font-weight:500;
+  color:var(--text);
+}
+
+
+/* V8 bundle-rule note */
+.hint b{
+  color:var(--pink2);
+}

@@ -154,7 +154,7 @@ document.getElementById("addOutfitTag").onclick = () => {
   const name = outfitTagName.value.trim();
   const probability = clamp(outfitTagProb.value,0,100);
   if(!name) return alert("Enter a tag name.");
-  data.outfitTags.push({id:uid(), name, probability, items:[]});
+  data.outfitTags.push({id:uid(), name, probability, requiredTags:"", incompatibleTags:"", items:[]});
   outfitTagName.value = ""; outfitTagProb.value = "";
   save(); render();
 };
@@ -223,14 +223,130 @@ function rollTasks(){
   return results;
 }
 function rollOutfits(){
-  const results = [];
+  const rolledTags = [];
+
+  // First pass: roll each tag normally.
   for(const tag of data.outfitTags){
     if(chance(tag.probability) && tag.items.length){
-      const item = tag.items[Math.floor(Math.random()*tag.items.length)];
-      results.push({tag:tag.name, name:item.name});
+      rolledTags.push(tag.id);
     }
   }
+
+  // Build complete bundles for every rolled tag.
+  // Example: Skirt requires Top, so Skirt becomes bundle [Skirt, Top].
+  let bundles = rolledTags.map(tagId => buildOutfitBundle(tagId));
+
+  // Remove empty bundles.
+  bundles = bundles.filter(bundle => bundle.length > 0);
+
+  // Resolve incompatibilities between complete bundles.
+  // Example: Dress incompatible with Skirt. Since Skirt bundle includes Top,
+  // Dress conflicts with the whole Skirt+Top bundle. Winner is 50/50.
+  bundles = resolveOutfitBundleConflicts(bundles);
+
+  // Flatten winning bundles into final unique tag IDs.
+  const finalTagIds = [];
+  for(const bundle of bundles){
+    for(const tagId of bundle){
+      if(!finalTagIds.includes(tagId)) finalTagIds.push(tagId);
+    }
+  }
+
+  // Pick one item from each final tag.
+  const results = [];
+  for(const tagId of finalTagIds){
+    const tag = getOutfitTagById(tagId);
+    if(!tag || !tag.items.length) continue;
+    const item = tag.items[Math.floor(Math.random()*tag.items.length)];
+    results.push({tag: tag.name, name: item.name});
+  }
+
   return results;
+}
+
+function normalizeRuleList(value){
+  return String(value || "")
+    .split(",")
+    .map(x => x.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function findOutfitTagByName(name){
+  const target = String(name || "").trim().toLowerCase();
+  return data.outfitTags.find(tag => tag.name.trim().toLowerCase() === target);
+}
+
+function getOutfitTagById(id){
+  return data.outfitTags.find(tag => tag.id === id);
+}
+
+function buildOutfitBundle(rootTagId, visited = new Set()){
+  if(visited.has(rootTagId)) return [];
+  visited.add(rootTagId);
+
+  const tag = getOutfitTagById(rootTagId);
+  if(!tag || !tag.items.length) return [];
+
+  const bundle = [rootTagId];
+  const requiredNames = normalizeRuleList(tag.requiredTags);
+
+  for(const reqName of requiredNames){
+    const requiredTag = findOutfitTagByName(reqName);
+    if(!requiredTag || !requiredTag.items.length) continue;
+
+    const requiredBundle = buildOutfitBundle(requiredTag.id, visited);
+    for(const id of requiredBundle){
+      if(!bundle.includes(id)) bundle.push(id);
+    }
+  }
+
+  return bundle;
+}
+
+function tagsDirectlyConflict(tagA, tagB){
+  const aBlocks = normalizeRuleList(tagA.incompatibleTags);
+  const bBlocks = normalizeRuleList(tagB.incompatibleTags);
+  const aName = tagA.name.trim().toLowerCase();
+  const bName = tagB.name.trim().toLowerCase();
+  return aBlocks.includes(bName) || bBlocks.includes(aName);
+}
+
+function bundlesConflict(bundleA, bundleB){
+  for(const idA of bundleA){
+    for(const idB of bundleB){
+      const tagA = getOutfitTagById(idA);
+      const tagB = getOutfitTagById(idB);
+      if(!tagA || !tagB) continue;
+      if(tagsDirectlyConflict(tagA, tagB)) return true;
+    }
+  }
+  return false;
+}
+
+function resolveOutfitBundleConflicts(bundles){
+  let result = bundles.map(bundle => [...bundle]);
+  let changed = true;
+  let safety = 0;
+
+  while(changed && safety < 50){
+    changed = false;
+    safety++;
+
+    outer:
+    for(let i = 0; i < result.length; i++){
+      for(let j = i + 1; j < result.length; j++){
+        if(bundlesConflict(result[i], result[j])){
+          // 50/50: remove either full bundle.
+          const removeIndex = Math.random() < 0.5 ? i : j;
+          result.splice(removeIndex, 1);
+          changed = true;
+          break outer;
+        }
+      }
+    }
+  }
+
+  return result;
 }
 
 /* Render */
@@ -339,43 +455,41 @@ function renderOutfits(){
   todayOutfit.innerHTML = outfit.length ? outfit.map(o=>`<div class="item"><b>${esc(o.tag)}</b><span>${esc(o.name)}</span></div>`).join("") : "No outfit rolled yet.";
   outfitTags.innerHTML = data.outfitTags.map(tag => `
     <div class="tag-card">
-      <div class="item">
-        <div><b>${esc(tag.name)}</b><div class="muted">Probability: ${esc(tag.probability)}%</div></div>
+      <div class="item outfit-tag-head">
+        <div>
+          <b>${esc(tag.name)}</b>
+          <div class="muted">Probability: ${esc(tag.probability)}%</div>
+        </div>
         <div class="item-actions">
           <input type="number" min="0" max="100" value="${esc(tag.probability)}" onchange="updateOutfitTag('${tag.id}',this.value)">
           <button class="delete" onclick="deleteOutfitTag('${tag.id}')">Delete Tag</button>
         </div>
       </div>
-      <div class="inline-form">
+
+      <div class="rule-box">
+        <label class="rule-label">Required Tags
+          <input value="${esc(tag.requiredTags || "")}" placeholder="Top, Shoes" onchange="updateOutfitTagRule('${tag.id}','requiredTags',this.value)">
+        </label>
+        <label class="rule-label">Incompatible Tags
+          <input value="${esc(tag.incompatibleTags || "")}" placeholder="Dress, Skirt" onchange="updateOutfitTagRule('${tag.id}','incompatibleTags',this.value)">
+        </label>
+      </div>
+
+      <div class="form-grid outfit-add">
         <input id="outfitItem-${tag.id}" placeholder="Item name">
         <button onclick="addOutfitItem('${tag.id}')">Add Item</button>
       </div>
+
       <div class="list">
         ${tag.items.map(item => `
-          <div class="item"><b>${esc(item.name)}</b><button class="delete" onclick="deleteOutfitItem('${tag.id}','${item.id}')">Delete</button></div>
+          <div class="item">
+            <b>${esc(item.name)}</b>
+            <button class="delete" onclick="deleteOutfitItem('${tag.id}','${item.id}')">Delete</button>
+          </div>
         `).join("") || `<div class="muted">No items in this tag.</div>`}
       </div>
     </div>
   `).join("") || `<div class="muted">No outfit tags yet.</div>`;
-}
-function renderResults(){
-  if(!data.todayResults){
-    results.classList.add("hidden");
-    return;
-  }
-  const r = data.todayResults;
-  results.classList.remove("hidden");
-  results.innerHTML = `
-    <h2>Today's Results</h2>
-    <div class="result-grid">
-      <div class="result-box"><h4>Chastity</h4><p>${esc(r.chastity.result)}${r.chastity.cage ? " — " + esc(r.chastity.cage) : ""}</p></div>
-      <div class="result-box"><h4>Content</h4><p>${esc(r.content)}</p></div>
-      <div class="result-box"><h4>Game</h4><p>${esc(r.game)}</p></div>
-      <div class="result-box"><h4>Tasks</h4><p>${(r.tasks||[]).map(t=>`${esc(t.tag)} — ${esc(t.name)}`).join("<br>") || "No tasks"}</p></div>
-      <div class="result-box"><h4>Outfits</h4><p>${(r.outfits||[]).map(o=>`${esc(o.tag)} — ${esc(o.name)}`).join("<br>") || "No outfit items"}</p></div>
-      <div class="result-box"><h4>Roulette</h4><p>${r.roulette.triggered ? "Triggered — " + esc(r.roulette.name) : "No trigger"}</p></div>
-    </div>
-  `;
 }
 
 /* Global edit helpers */
@@ -434,7 +548,7 @@ window.addOutfitItem = tagId => {
   const el = document.getElementById(`outfitItem-${tagId}`);
   const name = el.value.trim();
   if(!name) return alert("Enter an item name.");
-  tag.items.push({id:uid(), name});
+  tag.items.push({id:uid(), name, requires:"", incompatible:""});
   save(); render();
 };
 window.deleteOutfitItem = (tagId,itemId) => {
@@ -531,7 +645,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=5").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=8").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -548,4 +662,12 @@ if ("serviceWorker" in navigator) {
     if (toast) toast.classList.remove("hidden");
     setTimeout(() => window.location.reload(), 500);
   });
+}
+
+
+const devDressSkirtBtn = document.getElementById("devForceDressSkirtTest");
+if(devDressSkirtBtn){
+  devDressSkirtBtn.onclick = () => {
+    alert("Outfit rule test: create tags Dress, Skirt, Top. Set Dress incompatible with Skirt. Set Skirt required tags to Top. Then use Force Reroll All or high probabilities to test Dress vs Skirt+Top.");
+  };
 }

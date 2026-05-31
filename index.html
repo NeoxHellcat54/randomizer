@@ -6,7 +6,7 @@
   <title>Sissy Random</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=5" />
+  <link rel="stylesheet" href="styles.css?v=8" />
 </head>
 <body>
   <div class="bg-orb orb-a"></div>
@@ -69,6 +69,7 @@
         <button id="devRouletteBasePlus">Roulette Base +0.5%</button>
         <button id="devRouletteBaseMinus">Roulette Base -0.5%</button>
         <button id="devForceReroll">Force Reroll All</button>
+        <button id="devForceDressSkirtTest">Test Outfit Rules</button>
       </div>
     </section>
 
@@ -176,6 +177,7 @@
             <input id="outfitTagProb" type="number" min="0" max="100" step="1" placeholder="Probability %" />
             <button id="addOutfitTag">Add Tag</button>
           </div>
+          <p class="hint">Rules are tag-level. Required tags form a bundle. Incompatibilities are resolved between full bundles, like <b>Dress</b> vs <b>Skirt + Top</b>.</p>
           <div id="outfitTags" class="tag-list"></div>
         </details>
       </section>
@@ -183,6 +185,6 @@
   </div>
 
   <div id="updateToast" class="update-toast hidden">Update ready. Refreshing…</div>
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
