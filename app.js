@@ -457,9 +457,7 @@ window.toggleTodayTask = (taskId,checked) => {
 
 render();
 
-if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("./service-worker.js");
-}
+
 
 
 /* V4 Dev Tools */
@@ -529,3 +527,25 @@ function bindDevTools(){
   };
 }
 bindDevTools();
+
+
+/* V5 PWA update handling */
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./service-worker.js?v=5").then(reg => {
+    reg.addEventListener("updatefound", () => {
+      const worker = reg.installing;
+      if (!worker) return;
+      worker.addEventListener("statechange", () => {
+        if (worker.state === "installed" && navigator.serviceWorker.controller) {
+          worker.postMessage({type:"SKIP_WAITING"});
+        }
+      });
+    });
+  });
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    const toast = document.getElementById("updateToast");
+    if (toast) toast.classList.remove("hidden");
+    setTimeout(() => window.location.reload(), 500);
+  });
+}
