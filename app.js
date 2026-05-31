@@ -671,7 +671,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=13").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=14").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -1241,3 +1241,28 @@ function renderResults(){
     </div>
   `;
 }
+
+
+/* V14 Dev Tools patch */
+function bindV14DevTools(){
+  const minus = document.getElementById("devPunishMinus");
+  if(minus){
+    minus.onclick = () => {
+      data.punishmentBar = Math.max(0, Number(data.punishmentBar || 0) - 1);
+      save();
+      render();
+    };
+  }
+
+  const clear = document.getElementById("devClearPunishments");
+  if(clear){
+    clear.onclick = () => {
+      if(confirm("Clear all active temporary punishments?")){
+        data.activePunishments = [];
+        save();
+        render();
+      }
+    };
+  }
+}
+bindV14DevTools();
