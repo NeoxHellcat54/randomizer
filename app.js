@@ -460,3 +460,72 @@ render();
 if("serviceWorker" in navigator){
   navigator.serviceWorker.register("./service-worker.js");
 }
+
+
+/* V4 Dev Tools */
+function forceRollAll(){
+  data.lastRollDate = null;
+  save();
+  document.getElementById("rollAllBtn").disabled = false;
+  document.getElementById("rollAllBtn").click();
+}
+function bindDevTools(){
+  const panel = document.getElementById("devPanel");
+  const toggle = document.getElementById("devToggle");
+  if(!panel || !toggle) return;
+  toggle.onclick = () => panel.classList.toggle("hidden");
+
+  document.getElementById("devUnlockRoll").onclick = () => {
+    data.lastRollDate = null;
+    save(); render();
+    alert("Today's roll has been unlocked.");
+  };
+  document.getElementById("devClearResults").onclick = () => {
+    data.todayResults = null;
+    data.rewardGrantedDate = null;
+    save(); render();
+  };
+  document.getElementById("devResetAll").onclick = () => {
+    if(confirm("Reset all local data?")){
+      localStorage.removeItem(KEY);
+      data = load();
+      save(); render();
+    }
+  };
+  document.getElementById("devRewardPlus").onclick = () => {
+    data.reward.progress = Math.min(data.reward.target || 999, (data.reward.progress || 0) + 1);
+    save(); render();
+  };
+  document.getElementById("devRewardMinus").onclick = () => {
+    data.reward.progress = Math.max(0, (data.reward.progress || 0) - 1);
+    save(); render();
+  };
+  document.getElementById("devChastityPlus").onclick = () => {
+    data.chastityProbability = Math.min(100, Number(data.chastityProbability || 0) + 5);
+    save(); render();
+  };
+  document.getElementById("devChastityMinus").onclick = () => {
+    data.chastityProbability = Math.max(0, Number(data.chastityProbability || 0) - 5);
+    save(); render();
+  };
+  document.getElementById("devTaxPlus").onclick = () => {
+    data.roulette.cumTax = Number(data.roulette.cumTax || 0) + 5;
+    save(); render();
+  };
+  document.getElementById("devTaxReset").onclick = () => {
+    data.roulette.cumTax = 0;
+    save(); render();
+  };
+  document.getElementById("devRouletteBasePlus").onclick = () => {
+    data.roulette.base = Math.round((Number(data.roulette.base || 0) + 0.5) * 10) / 10;
+    save(); render();
+  };
+  document.getElementById("devRouletteBaseMinus").onclick = () => {
+    data.roulette.base = Math.max(0, Math.round((Number(data.roulette.base || 0) - 0.5) * 10) / 10);
+    save(); render();
+  };
+  document.getElementById("devForceReroll").onclick = () => {
+    forceRollAll();
+  };
+}
+bindDevTools();

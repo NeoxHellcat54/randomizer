@@ -3,7 +3,7 @@
   "short_name": "SissyRandom",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#fff1f8",
-  "theme_color": "#ff74b8",
+  "background_color": "#fff3f9",
+  "theme_color": "#ff78ba",
   "icons": []
 }
