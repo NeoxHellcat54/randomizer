@@ -1,3 +1,16 @@
+
+/* V12 cache killer: removes old service workers/caches that may keep stale broken JS/CSS alive. */
+(function(){
+  try {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister()));
+    }
+    if ('caches' in window) {
+      caches.keys().then(keys => keys.forEach(key => caches.delete(key)));
+    }
+  } catch(e) { console.warn('Cache cleanup failed', e); }
+})();
+
 const KEY = "sissy_random_v2";
 
 const defaults = {

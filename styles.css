@@ -306,3 +306,11 @@ input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(255,120,186,.12)}
   .upgrade-card{align-items:stretch;flex-direction:column}
   .upgrade-card button{width:100%}
 }
+
+
+/* V12 runtime/cache debug */
+.runtime-error{
+  position:fixed;left:10px;right:10px;top:10px;z-index:10000;
+  padding:12px;border-radius:14px;background:#ffedf2;color:#a10038;
+  border:1px solid #ff9bbd;font-weight:800;box-shadow:0 10px 30px rgba(0,0,0,.15);
+}

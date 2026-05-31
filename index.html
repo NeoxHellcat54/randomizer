@@ -6,9 +6,11 @@
   <title>Sissy Random</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=11" />
+  <link rel="stylesheet" href="styles.css?v=12" />
 </head>
 <body>
+  <div id="runtimeErrorBox" class="runtime-error hidden"></div>
+  <script>window.addEventListener("error",e=>{const b=document.getElementById("runtimeErrorBox"); if(b){b.classList.remove("hidden"); b.textContent="Runtime error: "+e.message;}});</script>
   <div class="bg-orb orb-a"></div>
   <div class="bg-orb orb-b"></div>
 
@@ -237,6 +239,6 @@
   </div>
 
   <div id="updateToast" class="update-toast hidden">Update ready. Refreshing…</div>
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>
