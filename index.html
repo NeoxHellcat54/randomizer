@@ -6,7 +6,7 @@
   <title>Sissy Random</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=14" />
+  <link rel="stylesheet" href="styles.css?v=15" />
 </head>
 <body>
   <div id="runtimeErrorBox" class="runtime-error hidden"></div>
@@ -32,6 +32,7 @@
 
         <progress id="rewardBar" value="0" max="1"></progress>
         <div id="rewardProgress" class="progress-text">0 / 0 days</div>
+        <div id="rewardPathInfo" class="reward-path-info"></div>
 
         <details id="rewardDetails" class="manage">
           <summary>Manage Reward</summary>
@@ -69,6 +70,14 @@
           <div id="punishmentText" class="progress-text">0 / 10</div>
         </div>
       </section>
+
+      <section class="streak-summary compact-card">
+        <div class="row">
+          <div><span class="tiny">Current Streak</span><h2 id="currentStreakText">0</h2></div>
+          <div><span class="tiny">Longest Streak</span><h2 id="longestStreakText">0</h2></div>
+        </div>
+        <div id="streakMilestoneText" class="progress-text">Next milestone: 7 days</div>
+      </section>
     </header>
 
     <section id="devPanel" class="dev-panel hidden">
@@ -93,6 +102,9 @@
         <button id="devPunishBar">+10 Punishment Bar</button>
         <button id="devPunishMinus">-1 Punishment Bar</button>
         <button id="devClearPunishments">Clear Active Punishments</button>
+        <button id="devRewardReroll">Roll Next Reward</button>
+        <button id="devStreakPlus">+1 Streak</button>
+        <button id="devStreakReset">Reset Streak</button>
         <button id="devForceRSBD">Force RSBD Today</button>
         <button id="devShowRSBD">Show RSBD Dates</button>
         <button id="devForceDressSkirtTest">Test Outfit Rules</button>
@@ -106,7 +118,6 @@
     <nav class="tabs">
       <button class="tab active" data-tab="chastity">Chastity</button>
       <button class="tab" data-tab="content">Content</button>
-      <button class="tab" data-tab="game">Game</button>
       <button class="tab" data-tab="roulette">Roulette</button>
       <button class="tab" data-tab="tasks">Tasks</button>
       <button class="tab" data-tab="outfits">Outfits</button>
@@ -145,19 +156,6 @@
             <button id="addContent">Add</button>
           </div>
           <div id="contentList" class="list"></div>
-        </details>
-      </section>
-
-      <section id="game" class="panel hidden">
-        <div class="screen-head"><div><span class="tiny">Weighted roll</span><h2>Game</h2></div></div>
-        <details class="manage" open>
-          <summary>Manage Games</summary>
-          <div class="form-grid">
-            <input id="gameName" placeholder="Game name" />
-            <input id="gameWeight" type="number" min="1" step="1" placeholder="Weight" />
-            <button id="addGame">Add</button>
-          </div>
-          <div id="gameList" class="list"></div>
         </details>
       </section>
 
@@ -241,6 +239,6 @@
   </div>
 
   <div id="updateToast" class="update-toast hidden">Update ready. Refreshing…</div>
-  <script src="app.js?v=14"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>

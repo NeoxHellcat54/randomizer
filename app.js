@@ -671,7 +671,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=14").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=15").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -1266,3 +1266,137 @@ function bindV14DevTools(){
   }
 }
 bindV14DevTools();
+
+
+/* V15 reward path + streaks */
+const REWARD_PRESETS=[
+{id:"chastityDecrease",name:"Chastity Decrease",target:15,text:"Chastity probability -20% permanently."},
+{id:"taxRelief",name:"Tax Relief",target:15,text:"Cum Tax disabled for the next 5 completed days."},
+{id:"chastityAmnesty",name:"Chastity Amnesty",target:20,text:"Chastity treated as 0% for the next 7 completed days."},
+{id:"upgradeVoucher",name:"Upgrade Voucher",target:25,text:"Gain points equal to the cheapest available upgrade. The End ? is excluded."},
+{id:"rewardMultiplier",name:"Reward Multiplier",target:20,text:"Double points for the next 10 completed tasks."},
+{id:"rouletteProtection",name:"Roulette Protection",target:15,text:"Roulette cannot trigger for the next 5 completed days."},
+{id:"luckyWeek",name:"Lucky Week",target:20,text:"Content Double Roll guaranteed for the next 7 completed days."},
+{id:"shopping",name:"Shopping",target:25,text:"You get to buy a new item of clothing."},
+{id:"highHeelsLover",name:"High Heels Lover",target:40,text:"You get to buy a new pair of heels.",special:true}
+];
+const STREAK_MILESTONES=[{days:7,points:100},{days:30,points:500},{days:100,points:2000},{days:200,points:5000},{days:365,points:10000},{days:730,points:25000}];
+
+function ensureV15Data(){
+ data.rewardPath??={current:null,progress:0,recent:[],sinceHeels:[],claimedHistory:[]};
+ data.rewardEffects??=[];
+ data.currentStreak??=0;
+ data.longestStreak??=0;
+ data.streakClaims??={};
+ if(!data.rewardPath.current) rollNextRewardPath();
+ syncRewardObjectToPath();
+}
+function rewardDef(id){return REWARD_PRESETS.find(r=>r.id===id)}
+function currentRewardDef(){return rewardDef(data.rewardPath?.current)}
+function nonSpecialRewardIds(){return REWARD_PRESETS.filter(r=>!r.special).map(r=>r.id)}
+function highHeelsEligible(){return nonSpecialRewardIds().every(id=>(data.rewardPath.sinceHeels||[]).includes(id))}
+function syncRewardObjectToPath(){
+ const cur=currentRewardDef();
+ data.reward??={};
+ if(cur){data.reward.name=cur.name;data.reward.target=cur.target;data.reward.progress=data.rewardPath.progress||0;data.reward.locked=true;data.reward.preset=cur.id}
+}
+function rollNextRewardPath(){
+ data.rewardPath??={current:null,progress:0,recent:[],sinceHeels:[],claimedHistory:[]};
+ let pool=REWARD_PRESETS.filter(r=>!(data.rewardPath.recent||[]).includes(r.id));
+ pool=pool.filter(r=>r.id!=="highHeelsLover"||highHeelsEligible());
+ if(!pool.length) pool=REWARD_PRESETS.filter(r=>r.id!=="highHeelsLover");
+ const picked=pool[Math.floor(Math.random()*pool.length)];
+ data.rewardPath.current=picked.id; data.rewardPath.progress=0;
+ if(picked.id==="highHeelsLover"){data.rewardPath.sinceHeels=[]}
+ else if(!(data.rewardPath.sinceHeels||[]).includes(picked.id)){data.rewardPath.sinceHeels.push(picked.id)}
+ syncRewardObjectToPath();
+}
+function addRewardEffect(id,name,effect){
+ const existing=(data.rewardEffects||[]).find(e=>e.id===id);
+ if(existing){if(effect.completedDays) existing.completedDays=(existing.completedDays||0)+effect.completedDays; if(effect.tasks) existing.tasks=(existing.tasks||0)+effect.tasks}
+ else data.rewardEffects.push({id,name,...effect});
+}
+function rewardEffect(key){return (data.rewardEffects||[]).find(e=>e[key])?.[key]||null}
+function cheapestUpgradeCostOnly(){
+ if(typeof UPGRADE_DEFS==="undefined") return 0;
+ const costs=UPGRADE_DEFS.filter(u=>(data.upgrades?.[u.id]||0)<u.max).map(u=>upgradeCost(u.id));
+ return costs.length?Math.min(...costs):0;
+}
+function applyRewardPreset(id){
+ if(id==="chastityDecrease") data.chastityProbability=Math.max(0,Number(data.chastityProbability||0)-20);
+ if(id==="taxRelief") addRewardEffect("taxRelief","Tax Relief",{completedDays:5,disableCumTax:true});
+ if(id==="chastityAmnesty") addRewardEffect("chastityAmnesty","Chastity Amnesty",{completedDays:7,chastityZero:true});
+ if(id==="upgradeVoucher"){const c=cheapestUpgradeCostOnly(); data.points+=c; data.lifetimePoints+=Math.max(0,c)}
+ if(id==="rewardMultiplier") addRewardEffect("rewardMultiplier","Reward Multiplier",{tasks:10,pointMult:2});
+ if(id==="rouletteProtection") addRewardEffect("rouletteProtection","Roulette Protection",{completedDays:5,rouletteBlocked:true});
+ if(id==="luckyWeek") addRewardEffect("luckyWeek","Lucky Week",{completedDays:7,contentDoubleGuaranteed:true});
+ if(id==="shopping") alert("Shopping reward claimed: You get to buy a new item of clothing.");
+ if(id==="highHeelsLover") alert("High Heels Lover claimed: You get to buy a new pair of heels.");
+}
+function claimCurrentRewardPath(){
+ ensureV15Data();
+ const cur=currentRewardDef(); if(!cur) return;
+ if((data.rewardPath.progress||0)<cur.target) return alert("Reward is not ready yet.");
+ applyRewardPreset(cur.id);
+ data.rewardPath.claimedHistory.push(cur.id);
+ data.rewardPath.recent.unshift(cur.id); data.rewardPath.recent=data.rewardPath.recent.slice(0,2);
+ rollNextRewardPath(); save(); render();
+}
+window.claimCurrentRewardPath=claimCurrentRewardPath;
+function advanceRewardPathProgress(){ensureV15Data(); const cur=currentRewardDef(); if(cur){data.rewardPath.progress=Math.min(cur.target,(data.rewardPath.progress||0)+1); syncRewardObjectToPath()}}
+function consumeCompletedDayRewardEffects(){for(const e of data.rewardEffects||[]) if(e.completedDays) e.completedDays-=1; data.rewardEffects=(data.rewardEffects||[]).filter(e=>(!e.completedDays||e.completedDays>0)||(e.tasks&&e.tasks>0))}
+function consumeTaskRewardMultiplier(taskCount){const e=(data.rewardEffects||[]).find(x=>x.id==="rewardMultiplier"&&x.tasks>0); if(!e) return 1; const boosted=Math.min(taskCount,e.tasks); e.tasks-=boosted; if(e.tasks<=0)data.rewardEffects=data.rewardEffects.filter(x=>x!==e); return 1+(boosted/Math.max(1,taskCount))}
+function increaseStreakAndAward(){
+ data.currentStreak=(data.currentStreak||0)+1; data.longestStreak=Math.max(data.longestStreak||0,data.currentStreak);
+ for(const m of STREAK_MILESTONES){if(data.currentStreak===m.days){const prev=data.streakClaims[m.days]||0; const award=prev?Math.floor(m.points/2):m.points; data.points+=award; data.lifetimePoints+=award; data.streakClaims[m.days]=prev+1; setTimeout(()=>alert(`${m.days}-day streak reward: +${award} points`),60)}}
+}
+function breakStreak(){if((data.currentStreak||0)>0)data.lastBrokenStreak=data.currentStreak; data.currentStreak=0}
+
+function renderReward(){
+ ensureV15Data(); const cur=currentRewardDef();
+ const title=document.getElementById("rewardTitle"), bar=document.getElementById("rewardBar"), progress=document.getElementById("rewardProgress"), badge=document.getElementById("rewardLockBadge"), info=document.getElementById("rewardPathInfo"), details=document.getElementById("rewardDetails");
+ if(details) details.classList.add("hidden");
+ if(title) title.textContent=cur?cur.name:"No reward active";
+ if(bar){bar.max=cur?cur.target:1; bar.value=data.rewardPath.progress||0}
+ if(progress) progress.textContent=cur?`${data.rewardPath.progress||0} / ${cur.target} days`:"0 / 0 days";
+ if(badge) badge.textContent="Reward Path";
+ if(info&&cur){const ready=(data.rewardPath.progress||0)>=cur.target; const effects=(data.rewardEffects||[]).map(e=>e.completedDays?`${esc(e.name)}: ${e.completedDays} completed day${e.completedDays===1?"":"s"} left`:e.tasks?`${esc(e.name)}: ${e.tasks} task${e.tasks===1?"":"s"} left`:esc(e.name)).join("<br>"); info.innerHTML=`<div class="muted">${esc(cur.text)}</div>${ready?`<button onclick="claimCurrentRewardPath()" class="claim reward-claim">Claim Reward</button>`:""}${effects?`<div class="reward-effects"><b>Active Reward Effects</b><br>${effects}</div>`:""}`}
+}
+function rollRouletteV15(force=false){
+ if(rewardEffect("rouletteBlocked")&&!force) return {triggered:false,blocked:true};
+ return rollRoulette(force);
+}
+function rollAllV15(){
+ if(data.theEndUnlocked) return; const t=typeof localDateString==="function"?localDateString():today();
+ if(data.lastRollDate===t) return alert("Today's Roll All has already been used.");
+ if(typeof adjudicatePreviousRolledDayIfNeeded==="function") adjudicatePreviousRolledDayIfNeeded();
+ const rsbd=typeof isRSBD==="function"?isRSBD(t):false; const results={date:t,rsbd};
+ const chastityChance=rewardEffect("chastityZero")?0:data.chastityProbability; const chastityYes=rsbd?true:chance(chastityChance);
+ results.chastity={result:chastityYes?"YES":"NO",cage:null};
+ if(chastityYes){const cage=weightedRoll(data.cages); results.chastity.cage=cage?cage.name:"No cage configured"} else data.chastityProbability+=typeof chastityIncreaseAmount==="function"?chastityIncreaseAmount():1;
+ const contentRolls=(rewardEffect("contentDoubleGuaranteed")||chance(typeof upgradeLevel==="function"?upgradeLevel("contentDouble"):0))?2:1;
+ const cr=[]; for(let i=0;i<contentRolls;i++){const c=weightedRoll(data.content); cr.push(c?c.name:"No content configured")}
+ results.content=cr.join(" + "); results.game="";
+ results.tasks=rsbd&&typeof rsbdFillExactlySevenTasks==="function"?rsbdFillExactlySevenTasks():rollTasks();
+ results.outfits=typeof rollOutfits==="function"?rollOutfits(rsbd):[];
+ results.roulette=rollRouletteV15(rsbd);
+ data.lastRollDate=t; data.lastSeenDate=t; data.rewardGrantedDate=null; data.todayResults=results; save(); render();
+ if(rsbd) alert("✨ Random Sissy Bimbo Day ✨\nSpecial rules are active today.");
+ if(results.roulette.triggered&&results.roulette.url) window.open(results.roulette.url,"_blank");
+}
+window.toggleTodayTask=(taskId,checked)=>{
+ const tasks=data.todayResults?.tasks||[]; const task=tasks.find(x=>x.id===taskId); if(task) task.complete=checked;
+ const allDone=tasks.length&&tasks.every(x=>x.complete); const t=typeof localDateString==="function"?localDateString():today();
+ if(allDone&&data.rewardGrantedDate!==t){
+  if(data.todayResults?.rsbd){data.rewardGrantedDate=t; increaseStreakAndAward(); consumeCompletedDayRewardEffects(); alert("RSBD tasks complete. No points and no reward progress are gained today.")}
+  else {let earned=calculateTaskPoints(tasks); earned=Math.round(earned*consumeTaskRewardMultiplier(tasks.length)); data.points+=earned; data.lifetimePoints+=Math.max(0,earned); if(!activeEffect("rewardFrozen")) advanceRewardPathProgress(); increaseStreakAndAward(); consumeCompletedDayRewardEffects(); data.rewardGrantedDate=t; alert(`All tasks complete. You earned ${earned} points.`)}
+ }
+ save(); render();
+};
+if(typeof renderResults==="function"){const oldRR=renderResults; renderResults=function(){oldRR(); const el=document.getElementById("results"); if(!el)return; el.querySelectorAll(".result-box").forEach(b=>{const h=b.querySelector("h4"); if(h&&h.textContent.trim().toLowerCase()==="game") b.remove()})}}
+if(typeof adjudicatePreviousRolledDayIfNeeded==="function"){const oldAdj=adjudicatePreviousRolledDayIfNeeded; adjudicatePreviousRolledDayIfNeeded=function(){const r=data.todayResults; oldAdj(); if(r&&r.date&&r.date!==(typeof localDateString==="function"?localDateString():today())&&(r.tasks||[]).some(t=>!t.complete)) breakStreak()}}
+if(typeof processSkippedDays==="function"){const oldPS=processSkippedDays; processSkippedDays=function(){const before=data.lastSeenDate; oldPS(); const t=typeof localDateString==="function"?localDateString():today(); if(before&&before!==t) breakStreak()}}
+function renderV15(){ensureV15Data(); const cs=document.getElementById("currentStreakText"), ls=document.getElementById("longestStreakText"), sm=document.getElementById("streakMilestoneText"); if(cs)cs.textContent=data.currentStreak||0; if(ls)ls.textContent=data.longestStreak||0; if(sm){const next=STREAK_MILESTONES.find(m=>m.days>(data.currentStreak||0)); sm.textContent=next?`Next milestone: ${next.days} days`:"All streak milestones reached."} syncRewardObjectToPath()}
+const oldRenderForV15=render; render=function(){oldRenderForV15(); renderV15()};
+function bindV15(){const rb=document.getElementById("rollAllBtn"); if(rb)rb.onclick=rollAllV15; const tax=document.getElementById("cumTaxBtn"); if(tax)tax.onclick=()=>{if(rewardEffect("disableCumTax"))return alert("Tax Relief is active. Cum Tax did not increase."); data.roulette.cumTax+=typeof taxIncreaseAmount==="function"?taxIncreaseAmount():1; save(); render()}; const dr=document.getElementById("devRewardReroll"); if(dr)dr.onclick=()=>{const cur=data.rewardPath?.current; if(cur){data.rewardPath.recent.unshift(cur); data.rewardPath.recent=data.rewardPath.recent.slice(0,2)} rollNextRewardPath(); save(); render()}; const sp=document.getElementById("devStreakPlus"); if(sp)sp.onclick=()=>{increaseStreakAndAward(); save(); render()}; const sr=document.getElementById("devStreakReset"); if(sr)sr.onclick=()=>{data.currentStreak=0; save(); render()}}
+ensureV15Data(); bindV15(); save(); render();

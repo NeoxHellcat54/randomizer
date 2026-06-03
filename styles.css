@@ -314,3 +314,10 @@ input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(255,120,186,.12)}
   padding:12px;border-radius:14px;background:#ffedf2;color:#a10038;
   border:1px solid #ff9bbd;font-weight:800;box-shadow:0 10px 30px rgba(0,0,0,.15);
 }
+
+/* V15 reward path and streaks */
+#rewardDetails.hidden{display:none!important}
+.reward-path-info{margin-top:10px;display:grid;gap:8px}
+.reward-claim{width:100%}
+.reward-effects{margin-top:8px;padding:10px;border-radius:18px;border:1px solid var(--line);background:rgba(255,255,255,.58);color:var(--muted);font-size:.9rem;line-height:1.35}
+.streak-summary h2{margin:0;font-size:1.15rem}
