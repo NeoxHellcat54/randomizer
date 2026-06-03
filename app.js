@@ -671,7 +671,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=15.1").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=15.2").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -1269,7 +1269,7 @@ bindV14DevTools();
 
 
 /* V15 reward path + streaks */
-const REWARD_PRESETS=[
+var REWARD_PRESETS=[
 {id:"chastityDecrease",name:"Chastity Decrease",target:15,text:"Chastity probability -20% permanently."},
 {id:"taxRelief",name:"Tax Relief",target:15,text:"Cum Tax disabled for the next 5 completed days."},
 {id:"chastityAmnesty",name:"Chastity Amnesty",target:20,text:"Chastity treated as 0% for the next 7 completed days."},
@@ -1280,7 +1280,7 @@ const REWARD_PRESETS=[
 {id:"shopping",name:"Shopping",target:25,text:"You get to buy a new item of clothing."},
 {id:"highHeelsLover",name:"High Heels Lover",target:40,text:"You get to buy a new pair of heels.",special:true}
 ];
-const STREAK_MILESTONES=[{days:7,points:100},{days:30,points:500},{days:100,points:2000},{days:200,points:5000},{days:365,points:10000},{days:730,points:25000}];
+var STREAK_MILESTONES=[{days:7,points:100},{days:30,points:500},{days:100,points:2000},{days:200,points:5000},{days:365,points:10000},{days:730,points:25000}];
 
 function ensureV15Data(){
  data.rewardPath??={current:null,progress:0,recent:[],sinceHeels:[],claimedHistory:[]};
@@ -1291,9 +1291,9 @@ function ensureV15Data(){
  if(!data.rewardPath.current) rollNextRewardPath();
  syncRewardObjectToPath();
 }
-function rewardDef(id){return REWARD_PRESETS.find(r=>r.id===id)}
+function rewardDef(id){return (REWARD_PRESETS||[]).find(r=>r.id===id)}
 function currentRewardDef(){return rewardDef(data.rewardPath?.current)}
-function nonSpecialRewardIds(){return REWARD_PRESETS.filter(r=>!r.special).map(r=>r.id)}
+function nonSpecialRewardIds(){return (REWARD_PRESETS||[]).filter(r=>!r.special).map(r=>r.id)}
 function highHeelsEligible(){return nonSpecialRewardIds().every(id=>(data.rewardPath.sinceHeels||[]).includes(id))}
 function syncRewardObjectToPath(){
  const cur=currentRewardDef();
@@ -1302,9 +1302,9 @@ function syncRewardObjectToPath(){
 }
 function rollNextRewardPath(){
  data.rewardPath??={current:null,progress:0,recent:[],sinceHeels:[],claimedHistory:[]};
- let pool=REWARD_PRESETS.filter(r=>!(data.rewardPath.recent||[]).includes(r.id));
+ let pool=(REWARD_PRESETS||[]).filter(r=>!(data.rewardPath.recent||[]).includes(r.id));
  pool=pool.filter(r=>r.id!=="highHeelsLover"||highHeelsEligible());
- if(!pool.length) pool=REWARD_PRESETS.filter(r=>r.id!=="highHeelsLover");
+ if(!pool.length) pool=(REWARD_PRESETS||[]).filter(r=>r.id!=="highHeelsLover");
  const picked=pool[Math.floor(Math.random()*pool.length)];
  data.rewardPath.current=picked.id; data.rewardPath.progress=0;
  if(picked.id==="highHeelsLover"){data.rewardPath.sinceHeels=[]}
