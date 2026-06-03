@@ -671,7 +671,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=15.3").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=16").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -1407,3 +1407,188 @@ function renderV15(){ensureV15Data(); const cs=document.getElementById("currentS
 const oldRenderForV15=render; render=function(){oldRenderForV15(); renderV15()};
 function bindV15(){const rb=document.getElementById("rollAllBtn"); if(rb)rb.onclick=rollAllV15; const tax=document.getElementById("cumTaxBtn"); if(tax)tax.onclick=()=>{if(rewardEffect("disableCumTax"))return alert("Tax Relief is active. Cum Tax did not increase."); data.roulette.cumTax+=typeof taxIncreaseAmount==="function"?taxIncreaseAmount():1; save(); render()}; const dr=document.getElementById("devRewardReroll"); if(dr)dr.onclick=()=>{const cur=data.rewardPath?.current; if(cur){data.rewardPath.recent.unshift(cur); data.rewardPath.recent=data.rewardPath.recent.slice(0,2)} rollNextRewardPath(); save(); render()}; const sp=document.getElementById("devStreakPlus"); if(sp)sp.onclick=()=>{increaseStreakAndAward(); save(); render()}; const sr=document.getElementById("devStreakReset"); if(sr)sr.onclick=()=>{data.currentStreak=0; save(); render()}}
 ensureV15Data(); bindV15(); save(); render();
+
+
+/* =========================
+   V16 UI flow + animations
+========================= */
+
+function renderResults(){
+  const resultsEl = document.getElementById("results");
+  if(!resultsEl) return;
+
+  if(!data.todayResults){
+    resultsEl.classList.add("hidden");
+    resultsEl.innerHTML = "";
+    return;
+  }
+
+  const r = data.todayResults;
+  resultsEl.classList.remove("hidden");
+
+  const tasks = r.tasks || [];
+  const taskHtml = tasks.length ? tasks.map(t => `
+    <label class="home-task-check ${t.complete ? "done" : ""}">
+      <input type="checkbox" ${t.complete ? "checked" : ""} onchange="toggleTodayTask('${t.id}', this.checked)">
+      <span>
+        <b>${esc(t.name)}</b>
+        <small>${esc(t.tag)}${t.failsafe ? " · failsafe" : ""}${t.overflow ? " · overflow" : ""}${t.rsbd ? " · RSBD" : ""}</small>
+      </span>
+    </label>
+  `).join("") : `<div class="muted">No tasks rolled.</div>`;
+
+  const outfitCount = (r.outfits || []).length;
+  const rouletteText = r.roulette?.triggered ? `Triggered — ${esc(r.roulette.name)}` : (r.roulette?.blocked ? "Blocked by protection" : "No trigger");
+
+  resultsEl.innerHTML = `
+    <div class="today-card-main">
+      <div class="today-card-head">
+        <div>
+          <span class="tiny">${r.rsbd ? "Special Event" : "Today"}</span>
+          <h2>${r.rsbd ? "Random Sissy Bimbo Day" : "Today's Tasks"}</h2>
+        </div>
+        <span class="pill">${tasks.filter(t=>t.complete).length}/${tasks.length} done</span>
+      </div>
+
+      <div class="home-task-list">${taskHtml}</div>
+    </div>
+
+    <details class="daily-summary-card">
+      <summary>Roll Summary</summary>
+      <div class="summary-grid">
+        <div class="summary-item"><b>Chastity</b><span>${esc(r.chastity?.result || "")}${r.chastity?.cage ? " — " + esc(r.chastity.cage) : ""}</span></div>
+        <div class="summary-item"><b>Content</b><span>${esc(r.content || "No content configured")}</span></div>
+        <div class="summary-item"><b>Outfit</b><span>${outfitCount} item${outfitCount === 1 ? "" : "s"}</span></div>
+        <div class="summary-item"><b>Roulette</b><span>${rouletteText}</span></div>
+      </div>
+      ${(r.outfits || []).length ? `<div class="outfit-mini-list">${r.outfits.map(o=>`<span>${esc(o.tag)}: ${esc(o.name)}</span>`).join("")}</div>` : ""}
+    </details>
+  `;
+}
+
+function getRollAnimationStages(r){
+  if(!r) return [];
+  const tasks = r.tasks || [];
+  const outfits = r.outfits || [];
+  return [
+    {
+      icon:"♡",
+      label:"Chastity",
+      value:`${r.chastity?.result || ""}${r.chastity?.cage ? " — " + r.chastity.cage : ""}`
+    },
+    {
+      icon:"✦",
+      label:"Content",
+      value:r.content || "No content configured"
+    },
+    {
+      icon:"✓",
+      label:"Tasks",
+      value:`${tasks.length} task${tasks.length === 1 ? "" : "s"} for today`
+    },
+    {
+      icon:"👗",
+      label:"Outfit",
+      value:outfits.length ? `${outfits.length} outfit item${outfits.length === 1 ? "" : "s"} selected` : "No outfit items today"
+    },
+    {
+      icon:"🎰",
+      label:"Roulette",
+      value:r.roulette?.triggered ? `Triggered — ${r.roulette.name}` : (r.roulette?.blocked ? "Blocked by protection" : "No trigger")
+    }
+  ];
+}
+
+function playRollAnimation(){
+  const overlay = document.getElementById("rollOverlay");
+  const icon = document.getElementById("rollStageIcon");
+  const label = document.getElementById("rollStageLabel");
+  const value = document.getElementById("rollStageValue");
+  if(!overlay || !icon || !label || !value || !data.todayResults) return;
+
+  const stages = getRollAnimationStages(data.todayResults);
+  overlay.classList.remove("hidden");
+  overlay.classList.add("active");
+
+  let i = 0;
+  const showStage = () => {
+    const s = stages[i];
+    if(!s){
+      overlay.classList.remove("active");
+      overlay.classList.add("roll-fade-out");
+      setTimeout(()=>{
+        overlay.classList.add("hidden");
+        overlay.classList.remove("roll-fade-out");
+      }, 450);
+      return;
+    }
+
+    icon.textContent = s.icon;
+    label.textContent = s.label;
+    value.textContent = s.value;
+
+    const card = overlay.querySelector(".roll-stage-card");
+    if(card){
+      card.classList.remove("stage-pop");
+      void card.offsetWidth;
+      card.classList.add("stage-pop");
+    }
+
+    i++;
+    setTimeout(showStage, 1450);
+  };
+
+  showStage();
+}
+
+function renderV16Dashboard(){
+  const rollBox = document.querySelector(".roll-box");
+  const rollButton = document.getElementById("rollAllBtn");
+  const status = document.getElementById("rollStatus");
+  const t = typeof localDateString === "function" ? localDateString() : today();
+
+  if(rollBox && rollButton){
+    const rolledToday = data.lastRollDate === t;
+    rollBox.classList.toggle("rolled-state", rolledToday);
+
+    if(rolledToday && !data.theEndUnlocked){
+      rollButton.classList.add("hidden");
+      if(status) status.innerHTML = `<span class="daily-complete">✓ Today's rolls completed</span><br><span>Come back tomorrow</span>`;
+    } else {
+      rollButton.classList.remove("hidden");
+    }
+  }
+
+  const resultsEl = document.getElementById("results");
+  if(resultsEl && data.todayResults){
+    resultsEl.classList.add("home-results-priority");
+  }
+}
+
+// Wrap existing V15 Roll All so animation plays after generation.
+function bindV16RollAnimation(){
+  const btn = document.getElementById("rollAllBtn");
+  if(!btn) return;
+
+  const previousHandler = btn.onclick;
+  btn.onclick = () => {
+    const before = data.lastRollDate;
+    if(typeof previousHandler === "function"){
+      previousHandler();
+    }
+    const after = data.lastRollDate;
+    if(after && after !== before && data.todayResults){
+      setTimeout(playRollAnimation, 120);
+    }
+  };
+}
+
+// Wrap render so the compact home state updates last.
+const oldRenderV16 = render;
+render = function(){
+  oldRenderV16();
+  renderV16Dashboard();
+};
+
+bindV16RollAnimation();
+render();
