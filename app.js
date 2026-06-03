@@ -680,7 +680,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=19.4").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=19.5").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -3216,3 +3216,79 @@ render = function(){
 
 bindV194RollButton();
 v194BindSkip();
+
+
+/* V19.5 roulette popup blocker fix
+   Browsers block window.open if it happens later during animation.
+   So we reserve a blank popup immediately on the Roll All click, then navigate it at the Roulette reveal stage.
+*/
+var v195ReservedRouletteWindow = null;
+var v195ReservedRouletteKey = null;
+
+function v195ReserveRouletteWindowIfNeeded(){
+  const r = data.todayResults;
+  if(!r || !r.roulette || !r.roulette.triggered || !r.roulette.url) return;
+
+  const key = r.date || data.lastRollDate || today();
+  if(v195ReservedRouletteKey === key && v195ReservedRouletteWindow) return;
+
+  v195ReservedRouletteKey = key;
+  try {
+    v195ReservedRouletteWindow = window.open("about:blank", "_blank");
+    if(v195ReservedRouletteWindow && v195ReservedRouletteWindow.document){
+      v195ReservedRouletteWindow.document.write("<!doctype html><title>Roulette loading...</title><body style='font-family:sans-serif;background:#fff3f9;color:#ed4c97;display:grid;place-items:center;height:100vh;text-align:center;'><h1>Roulette result loading...</h1><p>This tab will open when the Roulette reveal appears.</p></body>");
+      v195ReservedRouletteWindow.document.close();
+    }
+  } catch(e) {
+    v195ReservedRouletteWindow = null;
+  }
+}
+
+function v194OpenRouletteWhenAllowed(){
+  const r = data.todayResults;
+  if(!r || !r.roulette || !r.roulette.triggered || !r.roulette.url) return;
+
+  const key = r.date || data.lastRollDate || today();
+  if(v194RouletteOpenedKey === key) return;
+  v194RouletteOpenedKey = key;
+
+  try {
+    if(v195ReservedRouletteWindow && !v195ReservedRouletteWindow.closed){
+      v195ReservedRouletteWindow.location.href = r.roulette.url;
+      v195ReservedRouletteWindow = null;
+      return;
+    }
+  } catch(e) {}
+
+  // Fallback for cases where the blank popup could not be reserved.
+  window.open(r.roulette.url, "_blank");
+}
+
+function bindV195RollButton(){
+  const btn = document.getElementById("rollAllBtn");
+  if(!btn) return;
+
+  btn.onclick = async () => {
+    if(v194RollAnimationRunning) return;
+
+    const rolled = v194RunCoreRoll();
+    if(!rolled) return;
+
+    // Must happen in the same user click event to avoid popup blocking.
+    v195ReserveRouletteWindowIfNeeded();
+
+    if(data.todayResults && data.todayResults.rsbd && typeof playRSBDIntro === "function"){
+      await playRSBDIntro();
+    }
+
+    setTimeout(playRollAnimation, 120);
+  };
+}
+
+const oldRenderV195 = render;
+render = function(){
+  oldRenderV195();
+  bindV195RollButton();
+};
+
+bindV195RollButton();
