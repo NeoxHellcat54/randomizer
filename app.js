@@ -671,7 +671,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=15.2").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=15.3").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -1283,6 +1283,10 @@ var REWARD_PRESETS=[
 var STREAK_MILESTONES=[{days:7,points:100},{days:30,points:500},{days:100,points:2000},{days:200,points:5000},{days:365,points:10000},{days:730,points:25000}];
 
 function ensureV15Data(){
+ if(!Array.isArray(REWARD_PRESETS) || REWARD_PRESETS.length===0){
+  data.rewardPath??={current:null,progress:0,recent:[],sinceHeels:[],claimedHistory:[]};
+  return;
+ }
  data.rewardPath??={current:null,progress:0,recent:[],sinceHeels:[],claimedHistory:[]};
  data.rewardEffects??=[];
  data.currentStreak??=0;
@@ -1305,7 +1309,9 @@ function rollNextRewardPath(){
  let pool=(REWARD_PRESETS||[]).filter(r=>!(data.rewardPath.recent||[]).includes(r.id));
  pool=pool.filter(r=>r.id!=="highHeelsLover"||highHeelsEligible());
  if(!pool.length) pool=(REWARD_PRESETS||[]).filter(r=>r.id!=="highHeelsLover");
+ if(!pool.length) return;
  const picked=pool[Math.floor(Math.random()*pool.length)];
+ if(!picked) return;
  data.rewardPath.current=picked.id; data.rewardPath.progress=0;
  if(picked.id==="highHeelsLover"){data.rewardPath.sinceHeels=[]}
  else if(!(data.rewardPath.sinceHeels||[]).includes(picked.id)){data.rewardPath.sinceHeels.push(picked.id)}
@@ -1335,7 +1341,7 @@ function applyRewardPreset(id){
 }
 function claimCurrentRewardPath(){
  ensureV15Data();
- const cur=currentRewardDef(); if(!cur) return;
+ const cur=currentRewardDef(); if(!cur) return alert("No reward active yet.");
  if((data.rewardPath.progress||0)<cur.target) return alert("Reward is not ready yet.");
  applyRewardPreset(cur.id);
  data.rewardPath.claimedHistory.push(cur.id);
@@ -1353,6 +1359,7 @@ function increaseStreakAndAward(){
 function breakStreak(){if((data.currentStreak||0)>0)data.lastBrokenStreak=data.currentStreak; data.currentStreak=0}
 
 function renderReward(){
+ if(!Array.isArray(REWARD_PRESETS) || REWARD_PRESETS.length===0) return;
  ensureV15Data(); const cur=currentRewardDef();
  const title=document.getElementById("rewardTitle"), bar=document.getElementById("rewardBar"), progress=document.getElementById("rewardProgress"), badge=document.getElementById("rewardLockBadge"), info=document.getElementById("rewardPathInfo"), details=document.getElementById("rewardDetails");
  if(details) details.classList.add("hidden");
