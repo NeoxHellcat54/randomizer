@@ -6,7 +6,7 @@
   <title>Sissy Random</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=15" />
+  <link rel="stylesheet" href="styles.css?v=15.1" />
 </head>
 <body>
   <div id="runtimeErrorBox" class="runtime-error hidden"></div>
@@ -235,10 +235,18 @@
         <div id="punishmentWheelList" class="list"></div>
       </section>
 
-    </main>
+    
+<section id="game" class="panel hidden legacy-hidden">
+  <input id="gameName" />
+  <input id="gameWeight" />
+  <button id="addGame">Add Game</button>
+  <div id="gameList"></div>
+</section>
+
+</main>
   </div>
 
   <div id="updateToast" class="update-toast hidden">Update ready. Refreshing…</div>
-  <script src="app.js?v=15"></script>
+  <script src="app.js?v=15.1"></script>
 </body>
 </html>
