@@ -521,3 +521,11 @@ input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(255,120,186,.12)}
     font-size:1.25rem;
   }
 }
+
+/* V16.1 summary readability */
+.summary-item span{
+  white-space:normal;
+}
+.daily-summary-card[open]{
+  background:rgba(255,255,255,.72);
+}
