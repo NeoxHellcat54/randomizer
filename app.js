@@ -215,9 +215,7 @@ document.getElementById("rollAllBtn").onclick = () => {
   save();
   render();
 
-  if(results.roulette.triggered && results.roulette.url){
-    window.open(results.roulette.url, "_blank");
-  }
+  /* V19.3: roulette URL is opened during the Roulette reveal stage, not immediately. */
 };
 
 function rollRoulette(){
@@ -682,7 +680,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=19.2").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=19.3").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -2924,3 +2922,124 @@ function showAppNotice(title, message){
   };
   overlay.addEventListener("click", close);
 }
+
+
+/* V19.3 animation timing + delayed roulette URL open */
+var v193RouletteOpenedForRollDate = null;
+
+function v193OpenRouletteForCurrentRoll(){
+  const r = data.todayResults;
+  if(!r || !r.roulette || !r.roulette.triggered || !r.roulette.url) return;
+  const rollKey = r.date || data.lastRollDate || today();
+  if(v193RouletteOpenedForRollDate === rollKey) return;
+  v193RouletteOpenedForRollDate = rollKey;
+  window.open(r.roulette.url, "_blank");
+}
+
+function v193StageDuration(stage){
+  return Number(stage && stage.duration) || 1450;
+}
+
+// More robust roll animation:
+// - Uses an absolute deadline per stage.
+// - If the browser throttles timers while alt-tabbed, it resumes by checking the actual elapsed time.
+// - Roulette URL opens only when the Roulette stage is reached.
+// - If skipped, roulette opens immediately if the current roll included a roulette URL.
+function playRollAnimation(){
+  const overlay = document.getElementById("rollOverlay");
+  const icon = document.getElementById("rollStageIcon");
+  const label = document.getElementById("rollStageLabel");
+  const value = document.getElementById("rollStageValue");
+  if(!overlay || !icon || !label || !value || !data.todayResults) return;
+
+  v18SkipRoll = false;
+  const stages = getRollAnimationStages(data.todayResults);
+  overlay.classList.remove("hidden");
+  overlay.classList.add("active");
+
+  let index = 0;
+  let deadline = 0;
+
+  const showCurrentStage = () => {
+    if(v18SkipRoll){
+      overlay.classList.add("hidden");
+      overlay.classList.remove("active","roll-fade-out");
+      v193OpenRouletteForCurrentRoll();
+      return;
+    }
+
+    const s = stages[index];
+    if(!s){
+      overlay.classList.remove("active");
+      overlay.classList.add("roll-fade-out");
+      setTimeout(()=>{
+        overlay.classList.add("hidden");
+        overlay.classList.remove("roll-fade-out");
+      }, 450);
+      return;
+    }
+
+    icon.textContent = s.icon;
+    label.textContent = s.label;
+    value.textContent = s.value;
+
+    if(String(s.label || "").toLowerCase().includes("roulette")){
+      v193OpenRouletteForCurrentRoll();
+    }
+
+    const card = overlay.querySelector(".roll-stage-card");
+    if(card){
+      card.classList.remove("stage-pop");
+      void card.offsetWidth;
+      card.classList.add("stage-pop");
+    }
+
+    deadline = performance.now() + v193StageDuration(s);
+  };
+
+  const tick = () => {
+    if(v18SkipRoll){
+      overlay.classList.add("hidden");
+      overlay.classList.remove("active","roll-fade-out");
+      v193OpenRouletteForCurrentRoll();
+      return;
+    }
+
+    if(performance.now() >= deadline){
+      index++;
+      showCurrentStage();
+    }
+
+    if(!overlay.classList.contains("hidden")){
+      setTimeout(tick, 120);
+    }
+  };
+
+  showCurrentStage();
+  setTimeout(tick, 120);
+}
+
+// Rebind Roll All one final time so the old immediate URL behavior cannot return.
+function bindV193RollAnimation(){
+  const btn = document.getElementById("rollAllBtn");
+  if(!btn) return;
+
+  const previous = btn.onclick;
+  btn.onclick = async () => {
+    const before = data.lastRollDate;
+    if(typeof previous === "function") previous();
+    const after = data.lastRollDate;
+
+    if(after && after !== before && data.todayResults){
+      // Reset per-roll roulette-open guard.
+      v193RouletteOpenedForRollDate = null;
+
+      if(data.todayResults.rsbd && typeof playRSBDIntro === "function"){
+        await playRSBDIntro();
+      }
+      setTimeout(playRollAnimation, 120);
+    }
+  };
+}
+
+bindV193RollAnimation();
