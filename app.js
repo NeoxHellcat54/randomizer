@@ -680,7 +680,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=19.3").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=19.4").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -1056,7 +1056,7 @@ function rollAllSystems(){
   render();
 
   /* V19.2: RSBD uses fullscreen intro, no browser alert. */
-  if(results.roulette.triggered && results.roulette.url) window.open(results.roulette.url, "_blank");
+  /* V19.4: delayed roulette open handled by animation stage */
 }
 
 function buyUpgrade(id){
@@ -1398,7 +1398,7 @@ function rollAllV15(){
  results.roulette=rollRouletteV15(rsbd);
  data.lastRollDate=t; data.lastSeenDate=t; data.rewardGrantedDate=null; data.todayResults=results; save(); render();
  /* V19.2: RSBD uses fullscreen intro, no browser alert. */
- if(results.roulette.triggered&&results.roulette.url) window.open(results.roulette.url,"_blank");
+ /* V19.4: delayed roulette open handled by animation stage */
 }
 window.toggleTodayTask=(taskId,checked)=>{
  const tasks=data.todayResults?.tasks||[]; const task=tasks.find(x=>x.id===taskId); if(task) task.complete=checked;
@@ -3043,3 +3043,176 @@ function bindV193RollAnimation(){
 }
 
 bindV193RollAnimation();
+
+
+/* V19.4 clean Roll All binding: no stacked animation wrappers, no immediate roulette URL */
+
+var v194RollAnimationRunning = false;
+var v194RouletteOpenedKey = null;
+
+function v194OpenRouletteWhenAllowed(){
+  const r = data.todayResults;
+  if(!r || !r.roulette || !r.roulette.triggered || !r.roulette.url) return;
+  const key = r.date || data.lastRollDate || today();
+  if(v194RouletteOpenedKey === key) return;
+  v194RouletteOpenedKey = key;
+  window.open(r.roulette.url, "_blank");
+}
+
+function v194RunCoreRoll(){
+  const t = typeof localDateString === "function" ? localDateString() : today();
+  if(data.theEndUnlocked) return false;
+  if(data.lastRollDate === t){
+    alert("Today's Roll All has already been used.");
+    return false;
+  }
+
+  if(typeof adjudicatePreviousRolledDayIfNeeded === "function") adjudicatePreviousRolledDayIfNeeded();
+
+  const rsbd = typeof isRSBD === "function" ? isRSBD(t) : false;
+  const results = {date:t, rsbd};
+
+  const chastityChance = (typeof rewardEffect === "function" && rewardEffect("chastityZero")) ? 0 : data.chastityProbability;
+  const chastityYes = rsbd ? true : chance(chastityChance);
+  results.chastity = {result: chastityYes ? "YES" : "NO", cage: null};
+
+  if(chastityYes){
+    const cage = weightedRoll(data.cages);
+    results.chastity.cage = cage ? cage.name : "No cage configured";
+  } else {
+    data.chastityProbability += typeof chastityIncreaseAmount === "function" ? chastityIncreaseAmount() : 1;
+  }
+
+  const guaranteedContent = typeof rewardEffect === "function" && rewardEffect("contentDoubleGuaranteed");
+  const contentRolls = (guaranteedContent || chance(typeof upgradeLevel === "function" ? upgradeLevel("contentDouble") : 0)) ? 2 : 1;
+  const contentResults = [];
+  for(let i=0;i<contentRolls;i++){
+    const c = weightedRoll(data.content);
+    contentResults.push(c ? c.name : "No content configured");
+  }
+  results.content = contentResults.join(" + ");
+  results.game = "";
+
+  results.tasks = rsbd && typeof rsbdFillExactlySevenTasks === "function" ? rsbdFillExactlySevenTasks() : rollTasks();
+  results.outfits = typeof rollOutfits === "function" ? rollOutfits(rsbd) : [];
+  results.roulette = typeof rollRouletteV15 === "function" ? rollRouletteV15(rsbd) : rollRoulette(rsbd);
+
+  data.lastRollDate = t;
+  data.lastSeenDate = t;
+  data.rewardGrantedDate = null;
+  data.todayResults = results;
+  v194RouletteOpenedKey = null;
+
+  save();
+  render();
+  return true;
+}
+
+function playRollAnimation(){
+  if(v194RollAnimationRunning) return;
+
+  const overlay = document.getElementById("rollOverlay");
+  const icon = document.getElementById("rollStageIcon");
+  const label = document.getElementById("rollStageLabel");
+  const value = document.getElementById("rollStageValue");
+  if(!overlay || !icon || !label || !value || !data.todayResults) return;
+
+  v194RollAnimationRunning = true;
+  v18SkipRoll = false;
+
+  const stages = getRollAnimationStages(data.todayResults);
+  overlay.classList.remove("hidden");
+  overlay.classList.add("active");
+
+  let index = 0;
+  let stageToken = 0;
+
+  const closeOverlay = () => {
+    overlay.classList.add("hidden");
+    overlay.classList.remove("active","roll-fade-out");
+    v194RollAnimationRunning = false;
+  };
+
+  const showNext = () => {
+    const myToken = ++stageToken;
+
+    if(v18SkipRoll){
+      v194OpenRouletteWhenAllowed();
+      closeOverlay();
+      return;
+    }
+
+    const s = stages[index++];
+    if(!s){
+      overlay.classList.remove("active");
+      overlay.classList.add("roll-fade-out");
+      setTimeout(closeOverlay, 450);
+      return;
+    }
+
+    icon.textContent = s.icon;
+    label.textContent = s.label;
+    value.textContent = s.value;
+
+    if(String(s.label || "").toLowerCase().includes("roulette")){
+      v194OpenRouletteWhenAllowed();
+    }
+
+    const card = overlay.querySelector(".roll-stage-card");
+    if(card){
+      card.classList.remove("stage-pop");
+      void card.offsetWidth;
+      card.classList.add("stage-pop");
+    }
+
+    const duration = Number(s.duration) || 1450;
+    setTimeout(() => {
+      if(myToken === stageToken) showNext();
+    }, duration);
+  };
+
+  showNext();
+}
+
+function bindV194RollButton(){
+  const btn = document.getElementById("rollAllBtn");
+  if(!btn) return;
+  btn.onclick = async () => {
+    if(v194RollAnimationRunning) return;
+
+    const rolled = v194RunCoreRoll();
+    if(!rolled) return;
+
+    if(data.todayResults && data.todayResults.rsbd && typeof playRSBDIntro === "function"){
+      await playRSBDIntro();
+    }
+
+    setTimeout(playRollAnimation, 120);
+  };
+}
+
+function v194BindSkip(){
+  const rollSkip = document.getElementById("skipRollAnimationBtn");
+  if(rollSkip){
+    rollSkip.onclick = () => {
+      v18SkipRoll = true;
+      v194OpenRouletteWhenAllowed();
+      const overlay = document.getElementById("rollOverlay");
+      if(overlay){
+        overlay.classList.add("hidden");
+        overlay.classList.remove("active","roll-fade-out");
+      }
+      v194RollAnimationRunning = false;
+    };
+  }
+}
+
+const oldRenderV194 = render;
+render = function(){
+  oldRenderV194();
+  bindV194RollButton();
+  v194BindSkip();
+};
+
+bindV194RollButton();
+v194BindSkip();
