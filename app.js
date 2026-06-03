@@ -671,7 +671,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=16.1").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=17").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -1761,3 +1761,163 @@ function playRollAnimation(){
 
   showStage();
 }
+
+
+/* V17 reward + punishment wheel animations */
+
+let v17WheelBusy = false;
+
+function showWheelOverlay({title, result, rarity, duration = 2600, callback}){
+  const overlay = document.getElementById("wheelOverlay");
+  const titleEl = document.getElementById("wheelTitle");
+  const resultEl = document.getElementById("wheelResult");
+  const wheel = document.getElementById("spinWheel");
+  if(!overlay || !titleEl || !resultEl || !wheel){
+    if(callback) callback();
+    return;
+  }
+
+  v17WheelBusy = true;
+  overlay.classList.remove("hidden");
+  overlay.classList.add("active");
+  overlay.dataset.rarity = rarity || "";
+
+  titleEl.textContent = title || "Rolling...";
+  resultEl.textContent = "Spinning...";
+  wheel.classList.remove("wheel-spin");
+  void wheel.offsetWidth;
+  wheel.classList.add("wheel-spin");
+
+  setTimeout(() => {
+    resultEl.textContent = result || "Done";
+    wheel.classList.remove("wheel-spin");
+    wheel.classList.add("wheel-land");
+  }, duration);
+
+  setTimeout(() => {
+    overlay.classList.add("wheel-fade-out");
+    setTimeout(() => {
+      overlay.classList.add("hidden");
+      overlay.classList.remove("active","wheel-fade-out");
+      wheel.classList.remove("wheel-land");
+      v17WheelBusy = false;
+      if(callback) callback();
+    }, 420);
+  }, duration + 1900);
+}
+
+function claimCurrentRewardPathAnimated(){
+  ensureV15Data();
+  const cur = currentRewardDef();
+  if(!cur) return;
+  if((data.rewardPath.progress || 0) < cur.target) return;
+
+  const rewardName = cur.name;
+  showWheelOverlay({
+    title:"Reward Unlocked",
+    result:rewardName,
+    rarity: cur.id === "highHeelsLover" ? "legendary" : "reward",
+    callback:() => {
+      applyRewardPreset(cur.id);
+      data.rewardPath.claimedHistory.push(cur.id);
+      data.rewardPath.recent.unshift(cur.id);
+      data.rewardPath.recent = data.rewardPath.recent.slice(0,2);
+      rollNextRewardPath();
+      save();
+      render();
+    }
+  });
+}
+
+window.claimCurrentRewardPath = claimCurrentRewardPathAnimated;
+
+function autoClaimRewardIfReady(){
+  if(v17WheelBusy) return;
+  if(!data.rewardPath || !data.rewardPath.current) return;
+  const cur = currentRewardDef();
+  if(!cur) return;
+  if((data.rewardPath.progress || 0) >= cur.target && !data._rewardAutoClaimPending){
+    data._rewardAutoClaimPending = true;
+    save();
+    setTimeout(() => {
+      data._rewardAutoClaimPending = false;
+      claimCurrentRewardPathAnimated();
+    }, 650);
+  }
+}
+
+function rollAvailablePunishmentsAnimated(){
+  const rolls = availablePunishmentRolls();
+  if(!rolls) return;
+
+  const rolled = [];
+  for(let i=0;i<rolls;i++){
+    rolled.push(rollOnePunishment());
+  }
+  data.punishmentBar = (data.punishmentBar || 0) % 10;
+  save();
+
+  let i = 0;
+  const next = () => {
+    const p = rolled[i];
+    if(!p){
+      render();
+      return;
+    }
+    showWheelOverlay({
+      title:`Punishment Roll ${i+1} / ${rolled.length}`,
+      result:`${p.rarity}: ${p.name}`,
+      rarity:p.rarity.toLowerCase(),
+      callback:() => {
+        i++;
+        next();
+      }
+    });
+  };
+  next();
+}
+
+window.rollAvailablePunishments = rollAvailablePunishmentsAnimated;
+
+function autoRollPunishmentsIfAvailable(){
+  if(v17WheelBusy) return;
+  const rolls = availablePunishmentRolls();
+  if(rolls > 0 && !data._punishmentAutoRollPending){
+    data._punishmentAutoRollPending = true;
+    save();
+    setTimeout(() => {
+      data._punishmentAutoRollPending = false;
+      rollAvailablePunishmentsAnimated();
+    }, 900);
+  }
+}
+
+function bindV17Buttons(){
+  const rp = document.getElementById("rollPunishmentsBtn");
+  if(rp) rp.onclick = rollAvailablePunishmentsAnimated;
+
+  const rewardPlus = document.getElementById("devRewardPlus");
+  if(rewardPlus){
+    rewardPlus.onclick = () => {
+      ensureV15Data();
+      const cur = currentRewardDef();
+      if(cur){
+        data.rewardPath.progress = Math.min(cur.target, (data.rewardPath.progress || 0) + 1);
+        syncRewardObjectToPath();
+      }
+      save();
+      render();
+    };
+  }
+}
+
+const oldRenderV17 = render;
+render = function(){
+  oldRenderV17();
+  bindV17Buttons();
+  autoClaimRewardIfReady();
+  autoRollPunishmentsIfAvailable();
+};
+
+bindV17Buttons();
+render();

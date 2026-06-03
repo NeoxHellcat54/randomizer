@@ -6,7 +6,7 @@
   <title>Sissy Random</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=16.1" />
+  <link rel="stylesheet" href="styles.css?v=17" />
 </head>
 <body>
   <div id="runtimeErrorBox" class="runtime-error hidden"></div>
@@ -247,6 +247,19 @@
   </div>
 
   <div id="updateToast" class="update-toast hidden">Update ready. Refreshing…</div>
+  <section id="wheelOverlay" class="wheel-overlay hidden" aria-live="polite">
+    <div class="wheel-card">
+      <div id="wheelTitle" class="wheel-title">Rolling...</div>
+      <div class="wheel-wrap">
+        <div id="spinWheel" class="spin-wheel">
+          <span>♡</span><span>✦</span><span>!</span><span>★</span>
+        </div>
+        <div class="wheel-pointer">▼</div>
+      </div>
+      <div id="wheelResult" class="wheel-result">...</div>
+    </div>
+  </section>
+
   <section id="rollOverlay" class="roll-overlay hidden" aria-live="polite">
     <div class="roll-stage-card">
       <div id="rollStageIcon" class="roll-stage-icon">♡</div>
@@ -256,6 +269,6 @@
     </div>
   </section>
 
-  <script src="app.js?v=16.1"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>

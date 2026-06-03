@@ -529,3 +529,120 @@ input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(255,120,186,.12)}
 .daily-summary-card[open]{
   background:rgba(255,255,255,.72);
 }
+
+/* V17 reward and punishment wheel animations */
+.wheel-overlay{
+  position:fixed;
+  inset:0;
+  z-index:100000;
+  display:grid;
+  place-items:center;
+  padding:18px;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(255,200,226,.96), transparent 34%),
+    radial-gradient(circle at 80% 10%, rgba(210,195,255,.96), transparent 34%),
+    linear-gradient(145deg, rgba(255,243,249,.97), rgba(244,238,255,.97));
+  backdrop-filter:blur(18px);
+}
+.wheel-overlay.hidden{display:none}
+.wheel-card{
+  width:min(92vw,430px);
+  display:grid;
+  justify-items:center;
+  gap:18px;
+  padding:28px;
+  border-radius:38px;
+  border:1px solid rgba(255,255,255,.82);
+  background:rgba(255,255,255,.76);
+  box-shadow:0 30px 70px rgba(237,76,151,.22);
+  text-align:center;
+}
+.wheel-title{
+  color:var(--pink2);
+  text-transform:uppercase;
+  letter-spacing:.16em;
+  font-size:.82rem;
+  font-weight:1000;
+}
+.wheel-wrap{
+  position:relative;
+  width:220px;
+  height:220px;
+  display:grid;
+  place-items:center;
+}
+.spin-wheel{
+  width:200px;
+  height:200px;
+  border-radius:50%;
+  position:relative;
+  display:grid;
+  place-items:center;
+  background:
+    conic-gradient(
+      from 0deg,
+      var(--pink) 0 25%,
+      var(--lav) 25% 50%,
+      #ffd1e8 50% 75%,
+      #fff 75% 100%
+    );
+  border:10px solid rgba(255,255,255,.78);
+  box-shadow:inset 0 0 0 2px var(--line), 0 18px 36px rgba(237,76,151,.2);
+}
+.spin-wheel span{
+  position:absolute;
+  font-weight:1000;
+  color:white;
+  font-size:1.35rem;
+  text-shadow:0 2px 8px rgba(0,0,0,.15);
+}
+.spin-wheel span:nth-child(1){top:22px;left:88px}
+.spin-wheel span:nth-child(2){right:28px;top:86px}
+.spin-wheel span:nth-child(3){bottom:22px;left:94px}
+.spin-wheel span:nth-child(4){left:30px;top:86px}
+.wheel-pointer{
+  position:absolute;
+  top:-7px;
+  color:var(--pink2);
+  font-size:2rem;
+  filter:drop-shadow(0 4px 6px rgba(0,0,0,.12));
+}
+.wheel-result{
+  min-height:54px;
+  display:grid;
+  place-items:center;
+  font-size:1.45rem;
+  line-height:1.15;
+  font-weight:1000;
+}
+.wheel-spin{
+  animation:wheelSpin 2.6s cubic-bezier(.15,.8,.2,1) forwards;
+}
+.wheel-land{
+  animation:wheelLand .45s ease;
+}
+.wheel-fade-out{
+  animation:wheelFadeOut .42s ease forwards;
+}
+.wheel-overlay[data-rarity="common"] .wheel-result{color:#7d6f85}
+.wheel-overlay[data-rarity="uncommon"] .wheel-result{color:#3b9b7b}
+.wheel-overlay[data-rarity="rare"] .wheel-result{color:#3c7cff}
+.wheel-overlay[data-rarity="epic"] .wheel-result{color:#9b4dff}
+.wheel-overlay[data-rarity="legendary"] .wheel-result,
+.wheel-overlay[data-rarity="reward"] .wheel-result{
+  color:var(--pink2);
+  text-shadow:0 0 16px rgba(255,120,186,.24);
+}
+@keyframes wheelSpin{
+  0%{transform:rotate(0deg) scale(.96)}
+  80%{transform:rotate(1240deg) scale(1.04)}
+  100%{transform:rotate(1320deg) scale(1)}
+}
+@keyframes wheelLand{
+  0%{transform:scale(1)}
+  50%{transform:scale(1.05)}
+  100%{transform:scale(1)}
+}
+@keyframes wheelFadeOut{
+  to{opacity:0}
+}
