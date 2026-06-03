@@ -6,7 +6,7 @@
   <title>Sissy Random</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=18.5" />
+  <link rel="stylesheet" href="styles.css?v=19" />
 </head>
 <body>
   <div id="runtimeErrorBox" class="runtime-error hidden"></div>
@@ -247,7 +247,16 @@
   </div>
 
   <div id="updateToast" class="update-toast hidden">Update ready. Refreshing…</div>
-<section id="realWheelOverlay" class="real-wheel-overlay hidden" aria-live="polite">
+<section id="rsbdIntroOverlay" class="rsbd-intro-overlay hidden" aria-live="polite">
+    <div class="rsbd-intro-card">
+      <div class="rsbd-intro-sparkles">✦ ✧ ✦</div>
+      <h1>Random Sissy Bimbo Day</h1>
+      <p>One of the 8 chosen days has arrived.</p>
+      <strong>Today has special rules.</strong>
+    </div>
+  </section>
+
+  <section id="realWheelOverlay" class="real-wheel-overlay hidden" aria-live="polite">
     <div class="real-wheel-card">
       <button id="skipWheelAnimationBtn" class="skip-wheel-btn">Skip</button>
       <div id="realWheelTitle" class="real-wheel-title">Wheel</div>
@@ -269,6 +278,6 @@
     </div>
   </section>
 
-  <script src="app.js?v=18.5"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>
