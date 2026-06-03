@@ -682,7 +682,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=18.3").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=18.4").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -2452,3 +2452,104 @@ v183ClearOldPendingFlags();
 v183BindPunishmentButtons();
 save();
 setTimeout(autoRollPunishmentsIfAvailable, 250);
+
+
+/* V18.4 wheel alignment fix
+   Previous builds could visually stop on the wrong color because the wheel's
+   target angle did not account consistently for the CSS conic origin.
+   This version uses a pointer-at-top coordinate system:
+   - slice 0 starts at top
+   - centers are measured clockwise from top
+   - wheel rotates counter to selected center so selected center lands at top
+*/
+
+function v184SliceCenterDeg(items, selectedIndex){
+  const total = items.reduce((s,x)=>s+(Number(x.weight)||1),0);
+  let before = 0;
+  for(let i=0;i<selectedIndex;i++) before += Number(items[i].weight)||1;
+  const selectedWeight = Number(items[selectedIndex].weight)||1;
+  return ((before + selectedWeight / 2) / total) * 360;
+}
+
+function v18TargetAngleForIndex(items, selectedIndex){
+  const center = v184SliceCenterDeg(items, selectedIndex);
+  // Negative rotation brings clockwise center back to top.
+  return -center;
+}
+
+function v18MakeConic(items){
+  if(!items || !items.length) return "conic-gradient(from -90deg, #fff 0deg 360deg)";
+  const total = items.reduce((s,x)=>s+(Number(x.weight)||1),0);
+  let acc = 0;
+  const stops = [];
+  items.forEach(item=>{
+    const start = (acc/total)*360;
+    acc += Number(item.weight)||1;
+    const end = (acc/total)*360;
+    stops.push(`${item.color || "#fff"} ${start}deg ${end}deg`);
+  });
+  // -90deg makes 0deg line up with the visual top pointer.
+  return `conic-gradient(from -90deg, ${stops.join(", ")})`;
+}
+
+function v18PopulateWheel(items){
+  const wheel = document.getElementById("realWheel");
+  if(!wheel) return;
+  wheel.innerHTML = "";
+  wheel.style.background = v18MakeConic(items);
+  wheel.className = "real-wheel";
+
+  items.forEach((item, idx)=>{
+    const label = document.createElement("div");
+    label.className = "real-wheel-label";
+    const center = v184SliceCenterDeg(items, idx);
+    label.style.transform = `rotate(${center}deg) translateY(-78px) rotate(${-center}deg)`;
+    label.textContent = item.short || item.name;
+    wheel.appendChild(label);
+  });
+}
+
+async function v18RollOnePunishmentAnimated(){
+  const rarityItems = Object.entries(V18_RARITY_WEIGHTS).map(([name, weight])=>({
+    name,
+    short:name[0],
+    weight,
+    color:V18_RARITY_COLORS[name]
+  }));
+
+  const rarityRoll = v18RollRarityWeighted();
+  const rarityIndex = rarityItems.findIndex(x=>x.name===rarityRoll.rarity);
+  const selectedRarity = rarityItems[rarityIndex];
+
+  await v18SpinWheel({
+    title:"Punishment Rarity",
+    items:rarityItems,
+    selectedIndex:rarityIndex,
+    resultText:selectedRarity.name,
+    rarity:selectedRarity.name,
+    duration:3800
+  });
+
+  const pool = PUNISHMENTS.filter(p=>p.rarity===selectedRarity.name);
+  const selectedIndex = Math.floor(Math.random()*pool.length);
+  const picked = pool[selectedIndex];
+
+  const punishmentItems = pool.map(p=>({
+    name:p.name,
+    short:p.name.split(" ").map(w=>w[0]).join("").slice(0,3),
+    weight:1,
+    color:V18_RARITY_COLORS[p.rarity]
+  }));
+
+  await v18SpinWheel({
+    title:`${selectedRarity.name} Punishment`,
+    items:punishmentItems,
+    selectedIndex,
+    resultText:picked.name,
+    rarity:picked.rarity,
+    duration:3600
+  });
+
+  picked.apply();
+  return picked;
+}

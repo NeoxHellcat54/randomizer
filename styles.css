@@ -793,3 +793,19 @@ input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(255,120,186,.12)}
   .real-wheel-label{transform-origin:center center;font-size:.58rem}
   .real-wheel::after{inset:68px}
 }
+
+/* V18.4 pointer clarity */
+.real-wheel-pointer{
+  text-shadow:0 2px 8px rgba(0,0,0,.18);
+}
+.real-wheel-area::after{
+  content:"";
+  position:absolute;
+  top:18px;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:var(--pink2);
+  z-index:4;
+  box-shadow:0 0 0 4px rgba(255,255,255,.72);
+}
