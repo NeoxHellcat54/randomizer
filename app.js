@@ -682,7 +682,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=19.1").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=19.2").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -1057,7 +1057,7 @@ function rollAllSystems(){
   save();
   render();
 
-  if(rsbd) alert("✨ Random Sissy Bimbo Day ✨\nSpecial rules are active today.");
+  /* V19.2: RSBD uses fullscreen intro, no browser alert. */
   if(results.roulette.triggered && results.roulette.url) window.open(results.roulette.url, "_blank");
 }
 
@@ -1399,7 +1399,7 @@ function rollAllV15(){
  results.outfits=typeof rollOutfits==="function"?rollOutfits(rsbd):[];
  results.roulette=rollRouletteV15(rsbd);
  data.lastRollDate=t; data.lastSeenDate=t; data.rewardGrantedDate=null; data.todayResults=results; save(); render();
- if(rsbd) alert("✨ Random Sissy Bimbo Day ✨\nSpecial rules are active today.");
+ /* V19.2: RSBD uses fullscreen intro, no browser alert. */
  if(results.roulette.triggered&&results.roulette.url) window.open(results.roulette.url,"_blank");
 }
 window.toggleTodayTask=(taskId,checked)=>{
@@ -2901,3 +2901,26 @@ render = function(){
 
 bindV19RollAnimation();
 render();
+
+
+/* V19.2 app-style notice helper */
+function showAppNotice(title, message){
+  const overlay = document.getElementById("rsbdIntroOverlay");
+  if(!overlay) return alert(`${title}\n${message}`);
+  const h = overlay.querySelector("h1");
+  const p = overlay.querySelector("p");
+  const s = overlay.querySelector("strong");
+  if(h) h.textContent = title;
+  if(p) p.textContent = message;
+  if(s) s.textContent = "Tap anywhere to continue.";
+  overlay.classList.remove("hidden","rsbd-intro-out");
+  const close = () => {
+    overlay.classList.add("rsbd-intro-out");
+    setTimeout(()=>{
+      overlay.classList.add("hidden");
+      overlay.classList.remove("rsbd-intro-out");
+      overlay.removeEventListener("click", close);
+    }, 350);
+  };
+  overlay.addEventListener("click", close);
+}
