@@ -671,7 +671,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=18").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=18.1").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -1927,11 +1927,11 @@ render();
    V18 Real Wheels + Skip Animation
 ========================= */
 
-let v18SkipRoll = false;
-let v18SkipWheel = false;
-let v18WheelBusy = false;
+var v18SkipRoll = false;
+var v18SkipWheel = false;
+var v18WheelBusy = false;
 
-const V18_RARITY_COLORS = {
+var V18_RARITY_COLORS = {
   Common:"#ffffff",
   Uncommon:"#22C55E",
   Rare:"#3B82F6",
@@ -1939,7 +1939,7 @@ const V18_RARITY_COLORS = {
   Legendary:"#FACC15"
 };
 
-const V18_RARITY_WEIGHTS = {Common:50, Uncommon:30, Rare:15, Epic:4, Legendary:1};
+var V18_RARITY_WEIGHTS = {Common:50, Uncommon:30, Rare:15, Epic:4, Legendary:1};
 
 function v18BindSkipButtons(){
   const rollSkip = document.getElementById("skipRollAnimationBtn");
@@ -2296,7 +2296,7 @@ async function rollAvailablePunishmentsAnimated(){
 window.rollAvailablePunishments = rollAvailablePunishmentsAnimated;
 
 function autoClaimRewardIfReady(){
-  if(v18WheelBusy) return;
+  if(typeof v18WheelBusy === "undefined" || v18WheelBusy) return;
   if(!data.rewardPath || !data.rewardPath.current) return;
   const cur = currentRewardDef();
   if(!cur) return;
@@ -2311,7 +2311,7 @@ function autoClaimRewardIfReady(){
 }
 
 function autoRollPunishmentsIfAvailable(){
-  if(v18WheelBusy) return;
+  if(typeof v18WheelBusy === "undefined" || v18WheelBusy) return;
   const rolls = availablePunishmentRolls();
   if(rolls > 0 && !data._punishmentAutoRollPending){
     data._punishmentAutoRollPending = true;
