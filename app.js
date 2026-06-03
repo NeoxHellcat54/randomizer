@@ -140,7 +140,7 @@ document.getElementById("claimRewardBtn").onclick = () => {
 /* Simple list adders */
 document.getElementById("addCage").onclick = () => addWeighted("cages","cageName","cageWeight");
 document.getElementById("addContent").onclick = () => addWeighted("content","contentName","contentWeight");
-document.getElementById("addGame").onclick = () => addWeighted("games","gameName","gameWeight");
+{ const el = document.getElementById("addGame"); if(el) el.onclick = () => addWeighted("games","gameName","gameWeight"); }
 function addWeighted(collection, nameId, weightId){
   const nameEl = document.getElementById(nameId), weightEl = document.getElementById(weightId);
   const name = nameEl.value.trim();
@@ -560,6 +560,17 @@ window.deleteTask = (tagId,taskId) => {
   if(tag) tag.tasks = tag.tasks.filter(x=>x.id!==taskId);
   save(); render();
 };
+
+/* V18.2 fix: restore tag-level outfit rule editor */
+window.updateOutfitTagRule = (tagId, field, value) => {
+  const tag = data.outfitTags.find(x => x.id === tagId);
+  if(tag && (field === "requiredTags" || field === "incompatibleTags")){
+    tag[field] = value;
+  }
+  save();
+  render();
+};
+
 window.updateOutfitTag = (tagId,value) => {
   const tag = data.outfitTags.find(x=>x.id===tagId);
   if(tag) tag.probability = clamp(value,0,100);
@@ -671,7 +682,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=18.1").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=18.2").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
