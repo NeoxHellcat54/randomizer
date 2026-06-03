@@ -682,7 +682,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=18.2").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=18.3").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -2379,3 +2379,76 @@ render = function(){
 
 bindV18Buttons();
 render();
+
+
+/* V18.3 punishment auto-spin fix */
+var v183PunishmentSpinScheduled = false;
+
+function v183ClearOldPendingFlags(){
+  // Older V17/V18 builds persisted these flags in localStorage.
+  // If they are stuck true, auto-spin never starts.
+  if(data._punishmentAutoRollPending) data._punishmentAutoRollPending = false;
+  if(data._rewardAutoClaimPending) data._rewardAutoClaimPending = false;
+}
+
+function autoRollPunishmentsIfAvailable(){
+  v183ClearOldPendingFlags();
+
+  if(typeof v18WheelBusy !== "undefined" && v18WheelBusy) return;
+  if(v183PunishmentSpinScheduled) return;
+
+  const rolls = typeof availablePunishmentRolls === "function" ? availablePunishmentRolls() : Math.floor((data.punishmentBar || 0) / 10);
+  if(rolls <= 0) return;
+
+  v183PunishmentSpinScheduled = true;
+
+  setTimeout(async () => {
+    v183PunishmentSpinScheduled = false;
+    if(typeof v18WheelBusy !== "undefined" && v18WheelBusy) {
+      autoRollPunishmentsIfAvailable();
+      return;
+    }
+    if((typeof availablePunishmentRolls === "function" ? availablePunishmentRolls() : Math.floor((data.punishmentBar || 0) / 10)) > 0){
+      await rollAvailablePunishmentsAnimated();
+    }
+  }, 500);
+}
+
+function v183BindPunishmentButtons(){
+  const rp = document.getElementById("rollPunishmentsBtn");
+  if(rp) rp.onclick = rollAvailablePunishmentsAnimated;
+
+  const plus = document.getElementById("devPunishBar");
+  if(plus){
+    plus.onclick = () => {
+      data.punishmentBar = Number(data.punishmentBar || 0) + 10;
+      v183ClearOldPendingFlags();
+      save();
+      render();
+      setTimeout(autoRollPunishmentsIfAvailable, 100);
+    };
+  }
+
+  const minus = document.getElementById("devPunishMinus");
+  if(minus){
+    minus.onclick = () => {
+      data.punishmentBar = Math.max(0, Number(data.punishmentBar || 0) - 1);
+      v183ClearOldPendingFlags();
+      save();
+      render();
+    };
+  }
+}
+
+// Wrap render one final time so this checker runs after all older render wrappers.
+const oldRenderV183 = render;
+render = function(){
+  oldRenderV183();
+  v183BindPunishmentButtons();
+  autoRollPunishmentsIfAvailable();
+};
+
+v183ClearOldPendingFlags();
+v183BindPunishmentButtons();
+save();
+setTimeout(autoRollPunishmentsIfAvailable, 250);
