@@ -682,7 +682,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=19").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=19.1").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -2714,8 +2714,8 @@ function v18SpinWheel({title, items, selectedIndex, resultText, rarity, duration
    V19 Polish: outfit cards, reward bar animation, RSBD intro
 ========================= */
 
-let v19LastRewardProgress = null;
-let v19RsbdIntroPlaying = false;
+var v19LastRewardProgress = null;
+var v19RsbdIntroPlaying = false;
 
 function outfitIconForTag(tag){
   const t = String(tag || "").toLowerCase();
@@ -2819,12 +2819,12 @@ function renderReward(){
     bar.max = cur ? cur.target : 1;
     bar.value = data.rewardPath.progress || 0;
     const current = data.rewardPath.progress || 0;
-    if(v19LastRewardProgress !== null && current !== v19LastRewardProgress){
+    if(typeof v19LastRewardProgress !== "undefined" && v19LastRewardProgress !== null && current !== v19LastRewardProgress){
       bar.classList.remove("reward-bar-bump");
       void bar.offsetWidth;
       bar.classList.add("reward-bar-bump");
     }
-    v19LastRewardProgress = current;
+    if(typeof v19LastRewardProgress !== "undefined") v19LastRewardProgress = current;
   }
   if(progress){
     const pct = cur ? Math.round(((data.rewardPath.progress || 0) / cur.target) * 100) : 0;
