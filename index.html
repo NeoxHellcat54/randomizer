@@ -6,7 +6,7 @@
   <title>Sissy Random</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=17" />
+  <link rel="stylesheet" href="styles.css?v=18" />
 </head>
 <body>
   <div id="runtimeErrorBox" class="runtime-error hidden"></div>
@@ -247,21 +247,21 @@
   </div>
 
   <div id="updateToast" class="update-toast hidden">Update ready. Refreshing…</div>
-  <section id="wheelOverlay" class="wheel-overlay hidden" aria-live="polite">
-    <div class="wheel-card">
-      <div id="wheelTitle" class="wheel-title">Rolling...</div>
-      <div class="wheel-wrap">
-        <div id="spinWheel" class="spin-wheel">
-          <span>♡</span><span>✦</span><span>!</span><span>★</span>
-        </div>
-        <div class="wheel-pointer">▼</div>
+<section id="realWheelOverlay" class="real-wheel-overlay hidden" aria-live="polite">
+    <div class="real-wheel-card">
+      <button id="skipWheelAnimationBtn" class="skip-wheel-btn">Skip</button>
+      <div id="realWheelTitle" class="real-wheel-title">Wheel</div>
+      <div class="real-wheel-area">
+        <div id="realWheel" class="real-wheel"></div>
+        <div class="real-wheel-pointer">▼</div>
       </div>
-      <div id="wheelResult" class="wheel-result">...</div>
+      <div id="realWheelResult" class="real-wheel-result">Spinning...</div>
     </div>
   </section>
 
   <section id="rollOverlay" class="roll-overlay hidden" aria-live="polite">
     <div class="roll-stage-card">
+      <button id="skipRollAnimationBtn" class="skip-roll-btn">Skip</button>
       <div id="rollStageIcon" class="roll-stage-icon">♡</div>
       <div id="rollStageLabel" class="roll-stage-label">Rolling...</div>
       <div id="rollStageValue" class="roll-stage-value">Get ready</div>
@@ -269,6 +269,6 @@
     </div>
   </section>
 
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>

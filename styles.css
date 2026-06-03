@@ -646,3 +646,150 @@ input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(255,120,186,.12)}
 @keyframes wheelFadeOut{
   to{opacity:0}
 }
+
+/* V18 real wheel animations */
+.skip-roll-btn,
+.skip-wheel-btn{
+  position:absolute;
+  top:14px;
+  right:14px;
+  z-index:2;
+  padding:8px 12px;
+  font-size:.8rem;
+  background:rgba(255,255,255,.82);
+  color:var(--pink2);
+  border:1px solid var(--line);
+  box-shadow:none;
+}
+.roll-stage-card{position:relative}
+.real-wheel-overlay{
+  position:fixed;
+  inset:0;
+  z-index:100000;
+  display:grid;
+  place-items:center;
+  padding:18px;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(255,200,226,.96), transparent 34%),
+    radial-gradient(circle at 80% 10%, rgba(210,195,255,.96), transparent 34%),
+    linear-gradient(145deg, rgba(255,243,249,.97), rgba(244,238,255,.97));
+  backdrop-filter:blur(18px);
+}
+.real-wheel-overlay.hidden{display:none}
+.real-wheel-card{
+  position:relative;
+  width:min(94vw,460px);
+  display:grid;
+  justify-items:center;
+  gap:16px;
+  padding:28px;
+  border-radius:38px;
+  border:1px solid rgba(255,255,255,.82);
+  background:rgba(255,255,255,.78);
+  box-shadow:0 30px 70px rgba(237,76,151,.22);
+  text-align:center;
+}
+.real-wheel-title{
+  color:var(--pink2);
+  text-transform:uppercase;
+  letter-spacing:.16em;
+  font-size:.82rem;
+  font-weight:1000;
+}
+.real-wheel-area{
+  position:relative;
+  width:270px;
+  height:270px;
+  display:grid;
+  place-items:center;
+}
+.real-wheel{
+  width:245px;
+  height:245px;
+  border-radius:50%;
+  position:relative;
+  border:10px solid rgba(255,255,255,.86);
+  box-shadow:inset 0 0 0 2px var(--line), 0 20px 42px rgba(237,76,151,.22);
+  overflow:hidden;
+}
+.real-wheel::after{
+  content:"";
+  position:absolute;
+  inset:78px;
+  border-radius:50%;
+  background:rgba(255,255,255,.85);
+  border:1px solid var(--line);
+}
+.real-wheel-label{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:46px;
+  margin-left:-23px;
+  margin-top:-10px;
+  text-align:center;
+  font-size:.64rem;
+  font-weight:1000;
+  color:#4c4052;
+  text-shadow:0 1px 6px rgba(255,255,255,.8);
+  z-index:2;
+  pointer-events:none;
+}
+.real-wheel-pointer{
+  position:absolute;
+  top:-10px;
+  color:var(--pink2);
+  font-size:2.1rem;
+  z-index:3;
+  filter:drop-shadow(0 4px 6px rgba(0,0,0,.12));
+}
+.real-wheel-result{
+  min-height:56px;
+  display:grid;
+  place-items:center;
+  font-size:1.5rem;
+  line-height:1.15;
+  font-weight:1000;
+}
+.real-wheel-fade-out{animation:wheelFadeOut .42s ease forwards}
+.real-wheel-overlay.rarity-common .real-wheel-card{box-shadow:0 0 30px rgba(255,255,255,.9)}
+.real-wheel-overlay.rarity-uncommon .real-wheel-card{box-shadow:0 0 36px rgba(34,197,94,.35)}
+.real-wheel-overlay.rarity-rare .real-wheel-card{box-shadow:0 0 40px rgba(59,130,246,.38)}
+.real-wheel-overlay.rarity-epic .real-wheel-card{box-shadow:0 0 46px rgba(168,85,247,.42)}
+.real-wheel-overlay.rarity-legendary .real-wheel-card{box-shadow:0 0 58px rgba(250,204,21,.58)}
+.real-wheel-overlay.rarity-common .real-wheel-result{color:#4c4052}
+.real-wheel-overlay.rarity-uncommon .real-wheel-result{color:#22C55E}
+.real-wheel-overlay.rarity-rare .real-wheel-result{color:#3B82F6}
+.real-wheel-overlay.rarity-epic .real-wheel-result{color:#A855F7}
+.real-wheel-overlay.rarity-legendary .real-wheel-result{color:#d9a600}
+.real-wheel-overlay.rarity-reward .real-wheel-result{color:var(--pink2)}
+.wheel-shake .real-wheel-card{animation:screenShake .32s linear 3}
+.legendary-flash{animation:legendFlash .8s ease}
+.confetti-piece{
+  position:absolute;
+  top:-20px;
+  font-size:1.2rem;
+  animation:confettiFall 1.6s ease-in forwards;
+  z-index:5;
+}
+@keyframes wheelFadeOut{to{opacity:0}}
+@keyframes screenShake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-5px)}
+  50%{transform:translateX(5px)}
+  75%{transform:translateX(-3px)}
+}
+@keyframes legendFlash{
+  0%,100%{filter:brightness(1)}
+  45%{filter:brightness(1.35)}
+}
+@keyframes confettiFall{
+  0%{transform:translateY(0) rotate(0deg);opacity:1}
+  100%{transform:translateY(110vh) rotate(360deg);opacity:0}
+}
+@media(max-width:520px){
+  .real-wheel-area{width:238px;height:238px}
+  .real-wheel{width:218px;height:218px}
+  .real-wheel-label{transform-origin:center center;font-size:.58rem}
+  .real-wheel::after{inset:68px}
+}

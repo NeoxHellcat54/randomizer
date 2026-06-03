@@ -671,7 +671,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=17").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=18").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -1920,4 +1920,451 @@ render = function(){
 };
 
 bindV17Buttons();
+render();
+
+
+/* =========================
+   V18 Real Wheels + Skip Animation
+========================= */
+
+let v18SkipRoll = false;
+let v18SkipWheel = false;
+let v18WheelBusy = false;
+
+const V18_RARITY_COLORS = {
+  Common:"#ffffff",
+  Uncommon:"#22C55E",
+  Rare:"#3B82F6",
+  Epic:"#A855F7",
+  Legendary:"#FACC15"
+};
+
+const V18_RARITY_WEIGHTS = {Common:50, Uncommon:30, Rare:15, Epic:4, Legendary:1};
+
+function v18BindSkipButtons(){
+  const rollSkip = document.getElementById("skipRollAnimationBtn");
+  if(rollSkip){
+    rollSkip.onclick = () => {
+      v18SkipRoll = true;
+      const overlay = document.getElementById("rollOverlay");
+      if(overlay){
+        overlay.classList.add("hidden");
+        overlay.classList.remove("active","roll-fade-out");
+      }
+    };
+  }
+
+  const wheelSkip = document.getElementById("skipWheelAnimationBtn");
+  if(wheelSkip){
+    wheelSkip.onclick = () => {
+      v18SkipWheel = true;
+    };
+  }
+}
+
+function v18MakeConic(items){
+  if(!items || !items.length) return "conic-gradient(#fff 0 100%)";
+  const total = items.reduce((s,x)=>s+(Number(x.weight)||1),0);
+  let acc = 0;
+  const stops = [];
+  items.forEach((item, idx)=>{
+    const start = (acc/total)*360;
+    acc += Number(item.weight)||1;
+    const end = (acc/total)*360;
+    stops.push(`${item.color || "#fff"} ${start}deg ${end}deg`);
+  });
+  return `conic-gradient(from -90deg, ${stops.join(", ")})`;
+}
+
+function v18TargetAngleForIndex(items, selectedIndex){
+  const total = items.reduce((s,x)=>s+(Number(x.weight)||1),0);
+  let before = 0;
+  for(let i=0;i<selectedIndex;i++) before += Number(items[i].weight)||1;
+  const selectedWeight = Number(items[selectedIndex].weight)||1;
+  const centerFraction = (before + selectedWeight/2) / total;
+  const centerDeg = centerFraction * 360;
+  // pointer is at top, wheel starts from -90deg in CSS conic; rotate so selected center lands at top
+  return 360 - centerDeg;
+}
+
+function v18PopulateWheel(items){
+  const wheel = document.getElementById("realWheel");
+  if(!wheel) return;
+  wheel.innerHTML = "";
+  wheel.style.background = v18MakeConic(items);
+  wheel.className = "real-wheel";
+
+  items.forEach((item, idx)=>{
+    const label = document.createElement("div");
+    label.className = "real-wheel-label";
+    const total = items.reduce((s,x)=>s+(Number(x.weight)||1),0);
+    let before = 0;
+    for(let i=0;i<idx;i++) before += Number(items[i].weight)||1;
+    const center = ((before + (Number(item.weight)||1)/2) / total) * 360;
+    label.style.transform = `rotate(${center}deg) translateY(-78px) rotate(${-center}deg)`;
+    label.textContent = item.short || item.name;
+    wheel.appendChild(label);
+  });
+}
+
+function v18SpinWheel({title, items, selectedIndex, resultText, rarity, duration=3600}){
+  return new Promise(resolve=>{
+    const overlay = document.getElementById("realWheelOverlay");
+    const wheel = document.getElementById("realWheel");
+    const titleEl = document.getElementById("realWheelTitle");
+    const resultEl = document.getElementById("realWheelResult");
+
+    if(!overlay || !wheel || !titleEl || !resultEl || !items || !items.length){
+      resolve();
+      return;
+    }
+
+    v18WheelBusy = true;
+    v18SkipWheel = false;
+    overlay.classList.remove("hidden","real-wheel-fade-out");
+    overlay.dataset.rarity = rarity || "";
+    titleEl.textContent = title || "Wheel";
+    resultEl.textContent = "Spinning...";
+
+    v18PopulateWheel(items);
+
+    const target = v18TargetAngleForIndex(items, selectedIndex);
+    const spins = 5 * 360;
+    const finalDeg = spins + target;
+
+    wheel.style.transition = "none";
+    wheel.style.transform = "rotate(0deg)";
+    void wheel.offsetWidth;
+
+    if(v18SkipWheel){
+      wheel.style.transform = `rotate(${target}deg)`;
+      resultEl.textContent = resultText;
+      resolve();
+      return;
+    }
+
+    wheel.style.transition = `transform ${duration}ms cubic-bezier(.12,.78,.16,1)`;
+    wheel.style.transform = `rotate(${finalDeg}deg)`;
+
+    const finish = () => {
+      resultEl.textContent = resultText;
+      overlay.classList.add(`rarity-${(rarity||"reward").toLowerCase()}`);
+
+      if((rarity||"").toLowerCase()==="epic"){
+        overlay.classList.add("wheel-shake");
+      }
+      if((rarity||"").toLowerCase()==="legendary"){
+        overlay.classList.add("legendary-flash");
+        v18Confetti();
+      }
+
+      setTimeout(()=>{
+        overlay.classList.add("real-wheel-fade-out");
+        setTimeout(()=>{
+          overlay.classList.add("hidden");
+          overlay.classList.remove("wheel-shake","legendary-flash","real-wheel-fade-out","rarity-common","rarity-uncommon","rarity-rare","rarity-epic","rarity-legendary","rarity-reward");
+          v18WheelBusy = false;
+          resolve();
+        }, 420);
+      }, rarity === "Legendary" ? 1900 : 1350);
+    };
+
+    if(v18SkipWheel){
+      finish();
+      return;
+    }
+
+    const timer = setTimeout(finish, duration + 120);
+    const skipCheck = setInterval(()=>{
+      if(v18SkipWheel){
+        clearInterval(skipCheck);
+        clearTimeout(timer);
+        wheel.style.transition = "transform .2s ease";
+        wheel.style.transform = `rotate(${target}deg)`;
+        setTimeout(finish, 220);
+      }
+    }, 80);
+  });
+}
+
+function v18Confetti(){
+  const overlay = document.getElementById("realWheelOverlay");
+  if(!overlay) return;
+  for(let i=0;i<26;i++){
+    const p = document.createElement("span");
+    p.className = "confetti-piece";
+    p.textContent = "✦";
+    p.style.left = `${Math.random()*100}%`;
+    p.style.animationDelay = `${Math.random()*0.35}s`;
+    p.style.color = i%2 ? "#FACC15" : "#fff";
+    overlay.appendChild(p);
+    setTimeout(()=>p.remove(), 1800);
+  }
+}
+
+/* Daily roll skip override */
+function playRollAnimation(){
+  const overlay = document.getElementById("rollOverlay");
+  const icon = document.getElementById("rollStageIcon");
+  const label = document.getElementById("rollStageLabel");
+  const value = document.getElementById("rollStageValue");
+  if(!overlay || !icon || !label || !value || !data.todayResults) return;
+
+  v18SkipRoll = false;
+  const stages = getRollAnimationStages(data.todayResults);
+  overlay.classList.remove("hidden");
+  overlay.classList.add("active");
+
+  let i = 0;
+  const showStage = () => {
+    if(v18SkipRoll){
+      overlay.classList.add("hidden");
+      overlay.classList.remove("active","roll-fade-out");
+      return;
+    }
+
+    const s = stages[i];
+    if(!s){
+      overlay.classList.remove("active");
+      overlay.classList.add("roll-fade-out");
+      setTimeout(()=>{
+        overlay.classList.add("hidden");
+        overlay.classList.remove("roll-fade-out");
+      }, 450);
+      return;
+    }
+
+    icon.textContent = s.icon;
+    label.textContent = s.label;
+    value.textContent = s.value;
+
+    const card = overlay.querySelector(".roll-stage-card");
+    if(card){
+      card.classList.remove("stage-pop");
+      void card.offsetWidth;
+      card.classList.add("stage-pop");
+    }
+
+    i++;
+    setTimeout(showStage, s.duration || 1450);
+  };
+
+  showStage();
+}
+
+/* Reward wheel: eligible reward pool + selected reward */
+function v18RewardPool(){
+  ensureV15Data();
+  let pool = REWARD_PRESETS.filter(r=>!(data.rewardPath.recent||[]).includes(r.id));
+  pool = pool.filter(r=>r.id!=="highHeelsLover" || highHeelsEligible());
+  if(!pool.length) pool = REWARD_PRESETS.filter(r=>r.id!=="highHeelsLover");
+  return pool;
+}
+
+function rollNextRewardPathAnimated(){
+  const pool = v18RewardPool();
+  if(!pool.length) return;
+  const selectedIndex = Math.floor(Math.random()*pool.length);
+  const picked = pool[selectedIndex];
+
+  const items = pool.map(r=>({
+    name:r.name,
+    short:r.name.split(" ").map(w=>w[0]).join("").slice(0,3),
+    weight:1,
+    color:r.id==="highHeelsLover" ? "#d8b4fe" : (r.id==="shopping" ? "#fbcfe8" : "#f9a8d4")
+  }));
+
+  return v18SpinWheel({
+    title:"Next Reward",
+    items,
+    selectedIndex,
+    resultText:picked.name,
+    rarity:picked.id==="highHeelsLover" ? "Legendary" : "reward",
+    duration:3400
+  }).then(()=>{
+    data.rewardPath.current = picked.id;
+    data.rewardPath.progress = 0;
+
+    if(picked.id==="highHeelsLover") data.rewardPath.sinceHeels = [];
+    else if(!(data.rewardPath.sinceHeels||[]).includes(picked.id)) data.rewardPath.sinceHeels.push(picked.id);
+
+    syncRewardObjectToPath();
+    save();
+    render();
+  });
+}
+
+async function claimCurrentRewardPathAnimated(){
+  ensureV15Data();
+  const cur = currentRewardDef();
+  if(!cur) return;
+  if((data.rewardPath.progress || 0) < cur.target) return;
+
+  await v18SpinWheel({
+    title:"Reward Complete",
+    items:[{name:cur.name, short:"♡", weight:1, color:"#f9a8d4"}],
+    selectedIndex:0,
+    resultText:cur.name,
+    rarity:cur.id==="highHeelsLover" ? "Legendary" : "reward",
+    duration:2400
+  });
+
+  applyRewardPreset(cur.id);
+  data.rewardPath.claimedHistory.push(cur.id);
+  data.rewardPath.recent.unshift(cur.id);
+  data.rewardPath.recent = data.rewardPath.recent.slice(0,2);
+  save();
+
+  await rollNextRewardPathAnimated();
+}
+
+window.claimCurrentRewardPath = claimCurrentRewardPathAnimated;
+
+/* Punishment wheel: rarity wheel then punishment wheel, then apply */
+function v18RollRarityWeighted(){
+  const entries = Object.entries(V18_RARITY_WEIGHTS);
+  const total = entries.reduce((s,[,w])=>s+w,0);
+  let r = Math.random()*total;
+  for(let i=0;i<entries.length;i++){
+    const [rarity, weight] = entries[i];
+    r -= weight;
+    if(r <= 0) return {rarity, index:i};
+  }
+  return {rarity:"Common", index:0};
+}
+
+async function v18RollOnePunishmentAnimated(){
+  const rarityItems = Object.entries(V18_RARITY_WEIGHTS).map(([name, weight])=>({
+    name,
+    short:name[0],
+    weight,
+    color:V18_RARITY_COLORS[name]
+  }));
+
+  const rarityRoll = v18RollRarityWeighted();
+  const rarityIndex = rarityItems.findIndex(x=>x.name===rarityRoll.rarity);
+
+  await v18SpinWheel({
+    title:"Punishment Rarity",
+    items:rarityItems,
+    selectedIndex:rarityIndex,
+    resultText:rarityRoll.rarity,
+    rarity:rarityRoll.rarity,
+    duration:3800
+  });
+
+  const pool = PUNISHMENTS.filter(p=>p.rarity===rarityRoll.rarity);
+  const selectedIndex = Math.floor(Math.random()*pool.length);
+  const picked = pool[selectedIndex];
+
+  const punishmentItems = pool.map(p=>({
+    name:p.name,
+    short:p.name.split(" ").map(w=>w[0]).join("").slice(0,3),
+    weight:1,
+    color:V18_RARITY_COLORS[p.rarity]
+  }));
+
+  await v18SpinWheel({
+    title:`${rarityRoll.rarity} Punishment`,
+    items:punishmentItems,
+    selectedIndex,
+    resultText:picked.name,
+    rarity:picked.rarity,
+    duration:3600
+  });
+
+  picked.apply();
+  return picked;
+}
+
+async function rollAvailablePunishmentsAnimated(){
+  const rolls = availablePunishmentRolls();
+  if(!rolls) return;
+
+  const remainder = (data.punishmentBar || 0) % 10;
+  data.punishmentBar = remainder;
+  save();
+  render();
+
+  for(let i=0;i<rolls;i++){
+    await v18RollOnePunishmentAnimated();
+    save();
+    render();
+  }
+}
+
+window.rollAvailablePunishments = rollAvailablePunishmentsAnimated;
+
+function autoClaimRewardIfReady(){
+  if(v18WheelBusy) return;
+  if(!data.rewardPath || !data.rewardPath.current) return;
+  const cur = currentRewardDef();
+  if(!cur) return;
+  if((data.rewardPath.progress || 0) >= cur.target && !data._rewardAutoClaimPending){
+    data._rewardAutoClaimPending = true;
+    save();
+    setTimeout(async () => {
+      data._rewardAutoClaimPending = false;
+      await claimCurrentRewardPathAnimated();
+    }, 650);
+  }
+}
+
+function autoRollPunishmentsIfAvailable(){
+  if(v18WheelBusy) return;
+  const rolls = availablePunishmentRolls();
+  if(rolls > 0 && !data._punishmentAutoRollPending){
+    data._punishmentAutoRollPending = true;
+    save();
+    setTimeout(async () => {
+      data._punishmentAutoRollPending = false;
+      await rollAvailablePunishmentsAnimated();
+    }, 900);
+  }
+}
+
+function bindV18Buttons(){
+  v18BindSkipButtons();
+
+  const rp = document.getElementById("rollPunishmentsBtn");
+  if(rp) rp.onclick = rollAvailablePunishmentsAnimated;
+
+  const rewardPlus = document.getElementById("devRewardPlus");
+  if(rewardPlus){
+    rewardPlus.onclick = () => {
+      ensureV15Data();
+      const cur = currentRewardDef();
+      if(cur){
+        data.rewardPath.progress = Math.min(cur.target, (data.rewardPath.progress || 0) + 1);
+        syncRewardObjectToPath();
+      }
+      save();
+      render();
+    };
+  }
+
+  const devReward = document.getElementById("devRewardReroll");
+  if(devReward){
+    devReward.onclick = async () => {
+      const cur = data.rewardPath?.current;
+      if(cur){
+        data.rewardPath.recent.unshift(cur);
+        data.rewardPath.recent = data.rewardPath.recent.slice(0,2);
+      }
+      await rollNextRewardPathAnimated();
+      save();
+      render();
+    };
+  }
+}
+
+const oldRenderV18 = render;
+render = function(){
+  oldRenderV18();
+  bindV18Buttons();
+  autoClaimRewardIfReady();
+  autoRollPunishmentsIfAvailable();
+};
+
+bindV18Buttons();
 render();
