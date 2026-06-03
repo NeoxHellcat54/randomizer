@@ -495,7 +495,7 @@ function renderOutfits(){
           <input value="${esc(tag.requiredTags || "")}" placeholder="Top, Shoes" onchange="updateOutfitTagRule('${tag.id}','requiredTags',this.value)">
         </label>
         <label class="rule-label">Incompatible Tags
-          <input value="${esc(tag.incompatibleTags || "")}" placeholder="Dress, Skirt" onchange="updateOutfitTagRule('${tag.id}','incompatibleTags',this.value)">
+          <input value="${esc(tag.incompatibleTags || "")}" placeholder="Dress, Skirt, all" onchange="updateOutfitTagRule('${tag.id}','incompatibleTags',this.value)">
         </label>
       </div>
 
@@ -680,7 +680,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=19.5").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=19.6").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -3292,3 +3292,22 @@ render = function(){
 };
 
 bindV195RollButton();
+
+
+/* V19.6 outfit incompatibility: "all"
+   Put "all" in a tag's incompatible tags field to make that tag conflict with every other tag.
+   It never conflicts with itself.
+*/
+function tagsDirectlyConflict(tagA, tagB){
+  if(!tagA || !tagB) return false;
+  if(tagA.id && tagB.id && tagA.id === tagB.id) return false;
+
+  const aBlocks = normalizeRuleList(tagA.incompatibleTags);
+  const bBlocks = normalizeRuleList(tagB.incompatibleTags);
+  const aName = tagA.name.trim().toLowerCase();
+  const bName = tagB.name.trim().toLowerCase();
+
+  if(aBlocks.includes("all") || bBlocks.includes("all")) return true;
+
+  return aBlocks.includes(bName) || bBlocks.includes(aName);
+}
