@@ -949,3 +949,78 @@ input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(255,120,186,.12)}
 @keyframes rsbdIntroOut{
   to{opacity:0; transform:scale(1.04)}
 }
+
+/* V20 Contract + Certificate */
+.contract-card{
+  padding:16px;
+  border-radius:28px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.74);
+  box-shadow:var(--shadow);
+  display:grid;
+  gap:12px;
+}
+.contract-text,
+.certificate-text{
+  padding:14px;
+  border-radius:22px;
+  background:linear-gradient(135deg, rgba(255,255,255,.82), rgba(255,232,243,.62));
+  border:1px solid var(--line);
+  line-height:1.48;
+}
+.contract-text h3,
+.certificate-text h3{
+  text-align:center;
+  color:var(--pink2);
+  margin:10px 0;
+}
+.contract-text h2,
+.certificate-text h2{
+  text-align:center;
+  color:var(--pink2);
+  font-size:2rem;
+}
+.signature-box{
+  margin-top:16px;
+  padding:14px;
+  border-radius:20px;
+  background:rgba(255,255,255,.72);
+  border:1px dashed rgba(237,76,151,.4);
+  display:grid;
+  gap:5px;
+  text-align:center;
+}
+.signature-box span{
+  color:var(--muted);
+  text-transform:uppercase;
+  letter-spacing:.12em;
+  font-size:.72rem;
+  font-weight:900;
+}
+.signature-box b{
+  font-size:1.2rem;
+}
+.danger-contract{
+  background:linear-gradient(135deg, #ed4c97, #a855f7);
+}
+.contract-stats,
+.certificate-grid{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:8px 12px;
+  padding:12px;
+  border-radius:20px;
+  background:rgba(255,255,255,.62);
+  border:1px solid var(--line);
+}
+.contract-stats div{
+  display:contents;
+}
+.contract-stats span,
+.certificate-grid span{
+  color:var(--muted);
+}
+.contract-stats b,
+.certificate-grid b{
+  color:var(--pink2);
+}

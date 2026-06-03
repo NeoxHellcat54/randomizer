@@ -6,7 +6,7 @@
   <title>Sissy Random</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=19.6" />
+  <link rel="stylesheet" href="styles.css?v=20" />
 </head>
 <body>
   <div id="runtimeErrorBox" class="runtime-error hidden"></div>
@@ -116,7 +116,8 @@
     <section id="results" class="results hidden"></section>
 
     <nav class="tabs">
-      <button class="tab active" data-tab="chastity">Chastity</button>
+      <button class="tab active" data-tab="contract">Contract</button>
+      <button class="tab" data-tab="chastity">Chastity</button>
       <button class="tab" data-tab="content">Content</button>
       <button class="tab" data-tab="roulette">Roulette</button>
       <button class="tab" data-tab="tasks">Tasks</button>
@@ -126,7 +127,37 @@
     </nav>
 
     <main class="screen">
-      <section id="chastity" class="panel">
+      
+      <section id="contract" class="panel">
+        <div class="screen-head">
+          <div><span class="tiny">V20</span><h2>Contract</h2></div>
+          <div class="pill">Status: <span id="contractStatusText">Unsigned</span></div>
+        </div>
+
+        <div id="contractUnsignedBox" class="contract-card">
+          <h3>The Sissy Random Contract</h3>
+          <p class="muted">The game can be configured and tested before signing. Once signed, progress resets, the real challenge begins, and Dev Tools are permanently removed for this run.</p>
+          <label class="rule-label">Contract Name
+            <input id="contractNameInput" placeholder="Enter name">
+          </label>
+          <div id="contractTextPreview" class="contract-text"></div>
+          <button id="signContractBtn" class="danger-contract">Sign Contract</button>
+        </div>
+
+        <div id="contractActiveBox" class="contract-card hidden">
+          <h3>Contract Active</h3>
+          <div id="signedContractText" class="contract-text"></div>
+          <h3>Contract Statistics</h3>
+          <div id="contractStatsBox" class="contract-stats"></div>
+        </div>
+
+        <div id="certificateBox" class="contract-card hidden">
+          <h3>Certificate of Completion</h3>
+          <div id="certificateText" class="certificate-text"></div>
+        </div>
+      </section>
+
+      <section id="chastity" class="panel hidden">
         <div class="screen-head">
           <div>
             <span class="tiny">Current chance</span>
@@ -278,6 +309,6 @@
     </div>
   </section>
 
-  <script src="app.js?v=19.6"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>
