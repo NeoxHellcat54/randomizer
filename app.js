@@ -682,7 +682,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=18.4").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=18.5").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -2552,4 +2552,159 @@ async function v18RollOnePunishmentAnimated(){
 
   picked.apply();
   return picked;
+}
+
+
+/* V18.5 SVG wheel fix
+   This replaces the conic-gradient wheel with a real SVG wheel.
+   The selected slice is calculated first, drawn as a real segment, and the SVG disc rotates so
+   that the selected slice's center is exactly under the top pointer.
+*/
+
+function v185Point(cx, cy, r, deg){
+  const rad = deg * Math.PI / 180;
+  return {
+    x: cx + r * Math.sin(rad),
+    y: cy - r * Math.cos(rad)
+  };
+}
+
+function v185SlicePath(cx, cy, r, startDeg, endDeg){
+  const start = v185Point(cx, cy, r, startDeg);
+  const end = v185Point(cx, cy, r, endDeg);
+  const largeArc = (endDeg - startDeg) > 180 ? 1 : 0;
+  return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y} Z`;
+}
+
+function v185BuildSlices(items){
+  const total = items.reduce((s,x)=>s+(Number(x.weight)||1),0);
+  let acc = 0;
+  return items.map((item, index)=>{
+    const weight = Number(item.weight)||1;
+    const start = (acc / total) * 360;
+    acc += weight;
+    const end = (acc / total) * 360;
+    return {
+      ...item,
+      index,
+      start,
+      end,
+      center:(start + end) / 2
+    };
+  });
+}
+
+function v18PopulateWheel(items){
+  const wheel = document.getElementById("realWheel");
+  if(!wheel) return;
+
+  const slices = v185BuildSlices(items);
+  const cx = 125, cy = 125, r = 118;
+  const labelR = 78;
+
+  const paths = slices.map(s => {
+    const label = v185Point(cx, cy, labelR, s.center);
+    const textColor = s.name === "Common" ? "#4c4052" : "#ffffff";
+    return `
+      <path d="${v185SlicePath(cx, cy, r, s.start, s.end)}" fill="${s.color || "#fff"}" stroke="rgba(255,255,255,.85)" stroke-width="2"></path>
+      <text x="${label.x}" y="${label.y}" text-anchor="middle" dominant-baseline="middle" fill="${textColor}" font-size="10" font-weight="900">${esc(s.short || s.name)}</text>
+    `;
+  }).join("");
+
+  wheel.innerHTML = `
+    <svg class="real-wheel-svg" viewBox="0 0 250 250" aria-hidden="true">
+      <g id="realWheelDisc">
+        ${paths}
+        <circle cx="125" cy="125" r="43" fill="rgba(255,255,255,.88)" stroke="rgba(255,120,186,.28)" stroke-width="2"></circle>
+        <text x="125" y="130" text-anchor="middle" fill="#ed4c97" font-size="24" font-weight="900">♡</text>
+      </g>
+    </svg>
+  `;
+  wheel.className = "real-wheel svg-mode";
+  wheel.dataset.slices = JSON.stringify(slices.map(s=>({center:s.center,name:s.name})));
+}
+
+function v18TargetAngleForIndex(items, selectedIndex){
+  const slices = v185BuildSlices(items);
+  const center = slices[selectedIndex]?.center || 0;
+  return -center;
+}
+
+function v18SpinWheel({title, items, selectedIndex, resultText, rarity, duration=3600}){
+  return new Promise(resolve=>{
+    const overlay = document.getElementById("realWheelOverlay");
+    const wheel = document.getElementById("realWheel");
+    const titleEl = document.getElementById("realWheelTitle");
+    const resultEl = document.getElementById("realWheelResult");
+
+    if(!overlay || !wheel || !titleEl || !resultEl || !items || !items.length){
+      resolve();
+      return;
+    }
+
+    v18WheelBusy = true;
+    v18SkipWheel = false;
+    overlay.classList.remove("hidden","real-wheel-fade-out","rarity-common","rarity-uncommon","rarity-rare","rarity-epic","rarity-legendary","rarity-reward");
+    overlay.dataset.rarity = rarity || "";
+    titleEl.textContent = title || "Wheel";
+    resultEl.textContent = "Spinning...";
+
+    v18PopulateWheel(items);
+
+    const disc = wheel.querySelector("#realWheelDisc");
+    const target = v18TargetAngleForIndex(items, selectedIndex);
+    const finalDeg = (360 * 6) + target;
+
+    if(!disc){
+      resultEl.textContent = resultText;
+      v18WheelBusy = false;
+      resolve();
+      return;
+    }
+
+    disc.style.transformOrigin = "125px 125px";
+    disc.style.transition = "none";
+    disc.style.transform = "rotate(0deg)";
+    void disc.getBoundingClientRect();
+
+    const finish = () => {
+      disc.style.transition = "transform .22s ease";
+      disc.style.transform = `rotate(${target}deg)`;
+      resultEl.textContent = resultText;
+      overlay.classList.add(`rarity-${(rarity||"reward").toLowerCase()}`);
+
+      if((rarity||"").toLowerCase()==="epic") overlay.classList.add("wheel-shake");
+      if((rarity||"").toLowerCase()==="legendary"){
+        overlay.classList.add("legendary-flash");
+        v18Confetti();
+      }
+
+      setTimeout(()=>{
+        overlay.classList.add("real-wheel-fade-out");
+        setTimeout(()=>{
+          overlay.classList.add("hidden");
+          overlay.classList.remove("wheel-shake","legendary-flash","real-wheel-fade-out","rarity-common","rarity-uncommon","rarity-rare","rarity-epic","rarity-legendary","rarity-reward");
+          v18WheelBusy = false;
+          resolve();
+        }, 420);
+      }, rarity === "Legendary" ? 1900 : 1350);
+    };
+
+    if(v18SkipWheel){
+      finish();
+      return;
+    }
+
+    disc.style.transition = `transform ${duration}ms cubic-bezier(.12,.78,.16,1)`;
+    disc.style.transform = `rotate(${finalDeg}deg)`;
+
+    const timer = setTimeout(finish, duration + 120);
+    const skipCheck = setInterval(()=>{
+      if(v18SkipWheel){
+        clearInterval(skipCheck);
+        clearTimeout(timer);
+        finish();
+      }
+    }, 80);
+  });
 }

@@ -809,3 +809,23 @@ input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(255,120,186,.12)}
   z-index:4;
   box-shadow:0 0 0 4px rgba(255,255,255,.72);
 }
+
+/* V18.5 SVG wheel visuals */
+.real-wheel.svg-mode{
+  background:none !important;
+  overflow:visible;
+  border:none;
+  box-shadow:none;
+}
+.real-wheel-svg{
+  width:245px;
+  height:245px;
+  display:block;
+  filter:drop-shadow(0 20px 32px rgba(237,76,151,.22));
+}
+.real-wheel.svg-mode::after{
+  display:none;
+}
+.real-wheel-area::after{
+  top:7px;
+}
