@@ -680,7 +680,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=20").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=21").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -987,26 +987,17 @@ function adjudicatePreviousRolledDayIfNeeded(){
   const r = data.todayResults;
   if(!r || !r.date || data.adjudicatedDates[r.date] || r.date === localDateString()) return;
   const incomplete = (r.tasks || []).filter(t=>!t.complete).length;
-  if(incomplete > 0) addPunishmentBar(r.rsbd ? incomplete : 1);
+  if(incomplete > 0) data.pointPenaltyDebt = Number(data.pointPenaltyDebt || 0) + incomplete * 2;
   data.adjudicatedDates[r.date] = true;
 }
 function processSkippedDays(){
   const t = localDateString();
-  if(!data.lastSeenDate){
-    data.lastSeenDate = t;
-    return;
-  }
-  const last = parseLocalDate(data.lastSeenDate);
-  const now = parseLocalDate(t);
-  const diff = Math.floor((now-last)/86400000);
-  if(diff <= 0) return;
-  for(let i=1;i<=diff;i++){
-    const d = new Date(last);
-    d.setDate(d.getDate()+i);
-    const ds = formatDate(d);
+  if(!data.lastSeenDate){ data.lastSeenDate = t; return; }
+  const daysAbsent = Math.floor((parseLocalDate(t)-parseLocalDate(data.lastSeenDate))/86400000);
+  if(daysAbsent >= 3){ addPunishmentBar(2 + Math.floor((daysAbsent-3)/2)); }
+  for(let i=0;i<Math.max(0,daysAbsent);i++){
     decrementDailyEffects();
     if(activeEffect("dailyPunishmentAdd")) addPunishmentBar(activeEffect("dailyPunishmentAdd"));
-    addPunishmentBar(isRSBD(ds) ? 10 : 3);
   }
   data.lastSeenDate = t;
 }
@@ -3696,3 +3687,142 @@ render = function(){
 ensureV20Data();
 save();
 render();
+
+
+/* =========================
+   V21 Engagement Redesign
+========================= */
+function ensureV21Data(){
+  data.pointPenaltyDebt ??= 0;
+  data.lastTaskSetId ??= null;
+  data.currentTaskSetRewarded ??= false;
+  data.rollMoreCountToday ??= 0;
+  data.rouletteRewardUsedDate ??= null;
+  data.rouletteRewardPending ??= null;
+}
+function v21NewTaskSet(tasks){
+  ensureV21Data();
+  data.lastTaskSetId = uid();
+  data.currentTaskSetRewarded = false;
+  return (tasks || []).map(t => ({...t, setId:data.lastTaskSetId, rewardCounted:false}));
+}
+function v21AllCurrentTasksComplete(){
+  const tasks = data.todayResults?.tasks || [];
+  return tasks.length > 0 && tasks.every(t=>t.complete);
+}
+function v21ApplyPointPenalty(basePoints, taskCount){
+  let total=0, debt=Number(data.pointPenaltyDebt||0), per=taskCount?basePoints/taskCount:0;
+  for(let i=0;i<taskCount;i++){ if(debt>0){ total += per*.75; debt--; } else total += per; }
+  data.pointPenaltyDebt=Math.max(0,debt);
+  return Math.round(total);
+}
+function calculateTaskPoints(tasks){
+  const raw=tasks.reduce((s,t)=>s+Number(t.pointsBase??75),0);
+  const base=v21ApplyPointPenalty(raw,tasks.length);
+  return Math.round(base*(1+(upgradeLevel('pointMultiplier')*.015))*combinedEffectMult('pointGainMult',1));
+}
+function v21RouletteRewardAmount(entry){ return Math.round(10000/Math.max(1,Number(entry?.weight)||1)); }
+function v21RollTaskSet(){ return v21NewTaskSet(rollTasks()); }
+
+function v194RunCoreRoll(){
+  ensureV21Data();
+  const t=typeof localDateString==='function'?localDateString():today();
+  if(data.theEndUnlocked) return false;
+  if(data.lastRollDate===t){ alert("Today's Roll All has already been used."); return false; }
+  if(typeof adjudicatePreviousRolledDayIfNeeded==='function') adjudicatePreviousRolledDayIfNeeded();
+  const rsbd=typeof isRSBD==='function'?isRSBD(t):false;
+  const results={date:t,rsbd};
+  const chastityChance=(typeof rewardEffect==='function'&&rewardEffect('chastityZero'))?0:data.chastityProbability;
+  const chastityYes=rsbd?true:chance(chastityChance);
+  results.chastity={result:chastityYes?'YES':'NO',cage:null};
+  if(chastityYes){ const cage=weightedRoll(data.cages); results.chastity.cage=cage?cage.name:'No cage configured'; }
+  else data.chastityProbability += typeof chastityIncreaseAmount==='function'?chastityIncreaseAmount():1;
+  const contentRolls=((typeof rewardEffect==='function'&&rewardEffect('contentDoubleGuaranteed'))||chance(typeof upgradeLevel==='function'?upgradeLevel('contentDouble'):0))?2:1;
+  const cr=[]; for(let i=0;i<contentRolls;i++){ const c=weightedRoll(data.content); cr.push(c?c.name:'No content configured'); }
+  results.content=cr.join(' + '); results.game='';
+  results.tasks=rsbd&&typeof rsbdFillExactlySevenTasks==='function'?v21NewTaskSet(rsbdFillExactlySevenTasks()):v21RollTaskSet();
+  results.outfits=typeof rollOutfits==='function'?rollOutfits(rsbd):[];
+  results.roulette={triggered:false,optional:true};
+  data.lastRollDate=t; data.lastSeenDate=t; data.rewardGrantedDate=null; data.rollMoreCountToday=0; data.rouletteRewardUsedDate=null; data.rouletteRewardPending=null; data.todayResults=results;
+  if(data.contract?.signed&&!data.contract?.fulfilled){ data.contractStats.totalRolls+=1; data.contractStats.totalTasksGenerated+=(results.tasks||[]).length; }
+  save(); render(); return true;
+}
+function v21RollMoreTasks(){
+  ensureV21Data();
+  if(!data.todayResults||data.lastRollDate!==localDateString()) return alert('Roll All first.');
+  if(!v21AllCurrentTasksComplete()) return alert('Complete the current task set before rolling more tasks.');
+  const tasks=v21RollTaskSet();
+  data.todayResults.tasks=tasks; data.rollMoreCountToday=Number(data.rollMoreCountToday||0)+1; data.currentTaskSetRewarded=false;
+  if(data.contract?.signed&&!data.contract?.fulfilled) data.contractStats.totalTasksGenerated += tasks.length;
+  save(); render(); if(typeof playRollAnimation==='function') setTimeout(playRollAnimation,120);
+}
+window.v21RollMoreTasks=v21RollMoreTasks;
+function v21RollRouletteReward(){
+  ensureV21Data();
+  if(!data.todayResults||data.lastRollDate!==localDateString()) return alert('Roll All first.');
+  if(!v21AllCurrentTasksComplete()) return alert('Complete the current task set before rolling roulette.');
+  if(data.rouletteRewardUsedDate===localDateString()) return alert('Roulette reward has already been used today.');
+  if(!data.roulette.entries.length) return alert('No roulette entries configured.');
+  const picked=weightedRoll(data.roulette.entries); if(!picked) return alert('No valid roulette entry configured.');
+  const reward=v21RouletteRewardAmount(picked);
+  data.rouletteRewardUsedDate=localDateString(); data.rouletteRewardPending={id:uid(),name:picked.name,url:picked.url,weight:Number(picked.weight)||1,reward,complete:false};
+  try{ const w=window.open('about:blank','_blank'); if(w) w.location.href=picked.url; else window.open(picked.url,'_blank'); }catch(e){ window.open(picked.url,'_blank'); }
+  save(); render();
+}
+window.v21RollRouletteReward=v21RollRouletteReward;
+function v21CompleteRouletteReward(){
+  ensureV21Data(); const r=data.rouletteRewardPending; if(!r||r.complete) return;
+  r.complete=true; data.points+=Number(r.reward)||0; data.lifetimePoints+=Math.max(0,Number(r.reward)||0);
+  if(data.contract?.signed&&!data.contract?.fulfilled) data.contractStats.totalPointsEarned+=Math.max(0,Number(r.reward)||0);
+  save(); render(); alert(`Roulette completed. You earned ${Number(r.reward||0).toLocaleString()} points.`);
+}
+window.v21CompleteRouletteReward=v21CompleteRouletteReward;
+window.toggleTodayTask=(taskId,checked)=>{
+  ensureV21Data();
+  const tasks=data.todayResults?.tasks||[]; const task=tasks.find(x=>x.id===taskId);
+  if(task){ const was=!!task.complete; task.complete=checked; if(checked&&!was&&data.contract?.signed&&!data.contract?.fulfilled){ data._contractCompletedTaskIds??=[]; if(!data._contractCompletedTaskIds.includes(taskId)){ data._contractCompletedTaskIds.push(taskId); data.contractStats.totalTasksCompleted+=1; } } }
+  const allDone=tasks.length&&tasks.every(x=>x.complete); const t=localDateString();
+  if(allDone&&!data.currentTaskSetRewarded){
+    if(data.todayResults?.rsbd){ data.currentTaskSetRewarded=true; increaseStreakAndAward(); consumeCompletedDayRewardEffects(); alert('RSBD task set complete. No points and no reward progress are gained today.'); }
+    else { let earned=calculateTaskPoints(tasks); earned=Math.round(earned*consumeTaskRewardMultiplier(tasks.length)); data.points+=earned; data.lifetimePoints+=Math.max(0,earned); if(data.contract?.signed&&!data.contract?.fulfilled) data.contractStats.totalPointsEarned+=Math.max(0,earned); if(!activeEffect('rewardFrozen')) advanceRewardPathProgress(); if(data.rewardGrantedDate!==t){ increaseStreakAndAward(); consumeCompletedDayRewardEffects(); data.rewardGrantedDate=t; } data.currentTaskSetRewarded=true; alert(`Task set complete. You earned ${earned} points. Reward progress increased by 1.`); }
+  }
+  save(); render();
+};
+function v21NextRSBDInfo(){
+  if(typeof ensureRSBDYear!=='function') return null;
+  const ts=localDateString(), td=parseLocalDate(ts), years=[td.getFullYear(),td.getFullYear()+1];
+  let c=[]; years.forEach(y=>c.push(...(ensureRSBDYear(y)||[]))); c=c.sort();
+  const next=c.find(d=>parseLocalDate(d)>=td); if(!next) return null;
+  return {date:next, days:Math.floor((parseLocalDate(next)-td)/86400000)};
+}
+function v21PrettyDate(s){ return parseLocalDate(s).toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'}); }
+function renderRSBDCountdown(){
+  const card=document.getElementById('rsbdCountdownCard'); if(!card) return; const info=v21NextRSBDInfo();
+  if(!info||info.days===0){ card.classList.add('hidden'); return; }
+  let label=`✨ NEXT RSBD IN ${info.days} DAYS ✨`, level='far';
+  if(info.days===1){ label='✨ RSBD TOMORROW ✨'; level='tomorrow'; } else if(info.days<=3){ label=`⚠ RSBD IN ${info.days} DAYS ⚠`; level='urgent'; } else if(info.days<=7) level='soon'; else if(info.days<=30) level='near';
+  card.className=`rsbd-countdown-card ${level}`; card.innerHTML=`<div class="rsbd-count-main">${label}</div><div class="rsbd-count-date">${v21PrettyDate(info.date)}</div>`;
+}
+function renderV21Buttons(){
+  ensureV21Data();
+  const el=document.getElementById('results');
+  if(el&&data.todayResults){
+    const old=el.querySelector('.v21-extra-controls'); if(old) old.remove();
+    const can=v21AllCurrentTasksComplete()&&data.lastRollDate===localDateString();
+    const rouletteDone=data.rouletteRewardUsedDate===localDateString(); const pending=data.rouletteRewardPending&&!data.rouletteRewardPending.complete;
+    const controls=document.createElement('div'); controls.className='v21-extra-controls'; controls.innerHTML=`
+      <button onclick="v21RollMoreTasks()" ${can?'':'disabled'}>Roll More Tasks</button>
+      <button onclick="v21RollRouletteReward()" ${can&&!rouletteDone?'':'disabled'}>Roll Roulette Reward</button>
+      ${pending?`<button class="claim" onclick="v21CompleteRouletteReward()">Complete Roulette: +${Number(data.rouletteRewardPending.reward||0).toLocaleString()} points</button>`:''}
+      ${data.rouletteRewardPending?.complete?`<div class="v21-roulette-done">Roulette reward completed: +${Number(data.rouletteRewardPending.reward||0).toLocaleString()} points</div>`:''}
+      ${data.pointPenaltyDebt?`<div class="v21-penalty-note">Point penalty debt: next ${data.pointPenaltyDebt} completed task${data.pointPenaltyDebt===1?'':'s'} worth 75%.</div>`:''}`;
+    el.appendChild(controls);
+  }
+  renderRSBDCountdown();
+}
+function renderRoulette(){
+  rouletteBase.textContent='Optional'; rouletteTax.textContent='Reward'; rouletteEffective.textContent='10000 / Weight';
+  rouletteList.innerHTML=data.roulette.entries.map(item=>`<div class="item"><div><b>${esc(item.name)}</b><div class="muted">${esc(item.url)}</div><div class="muted">Weight: ${esc(item.weight)} · Reward: ${v21RouletteRewardAmount(item).toLocaleString()} points</div></div><div class="item-actions"><input type="number" min="1" value="${esc(item.weight)}" onchange="updateRoulette('${item.id}','weight',this.value)"><button class="delete" onclick="deleteRoulette('${item.id}')">Delete</button></div></div>`).join('')||`<div class="muted">No roulette entries yet.</div>`;
+}
+const oldRenderV21=render; render=function(){ oldRenderV21(); renderV21Buttons(); };
+ensureV21Data(); save(); render();

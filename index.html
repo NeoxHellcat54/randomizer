@@ -6,7 +6,7 @@
   <title>Sissy Random</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=20" />
+  <link rel="stylesheet" href="styles.css?v=21" />
 </head>
 <body>
   <div id="runtimeErrorBox" class="runtime-error hidden"></div>
@@ -93,8 +93,8 @@
         <button id="devRewardMinus">Reward -1</button>
         <button id="devChastityPlus">Chastity +5%</button>
         <button id="devChastityMinus">Chastity -5%</button>
-        <button id="devTaxPlus">Cum Tax +5%</button>
-        <button id="devTaxReset">Reset Cum Tax</button>
+        <button id="devTaxPlus">Roulette Bonus +5%</button>
+        <button id="devTaxReset">Reset Roulette Bonus</button>
         <button id="devRouletteBasePlus">Roulette Base +0.5%</button>
         <button id="devRouletteBaseMinus">Roulette Base -0.5%</button>
         <button id="devForceReroll">Force Reroll All</button>
@@ -110,6 +110,8 @@
         <button id="devForceDressSkirtTest">Test Outfit Rules</button>
       </div>
     </section>
+
+    <section id="rsbdCountdownCard" class="rsbd-countdown-card hidden"></section>
 
     <section id="rsbdBanner" class="rsbd-banner hidden">✨ Random Sissy Bimbo Day ✨<br><span>Today has special rules.</span></section>
 
@@ -191,13 +193,13 @@
       </section>
 
       <section id="roulette" class="panel hidden">
-        <div class="screen-head"><div><span class="tiny">Cum tax</span><h2>Roulette</h2></div></div>
+        <div class="screen-head"><div><span class="tiny">Roulette bonus</span><h2>Roulette</h2></div></div>
         <div class="stat-grid">
           <div><span>Base</span><b id="rouletteBase">1</b>%</div>
           <div><span>Tax</span><b id="rouletteTax">0</b>%</div>
           <div><span>Total</span><b id="rouletteEffective">1</b>%</div>
         </div>
-        <button id="cumTaxBtn" class="wide">+1 Cum Tax</button>
+        <button id="cumTaxBtn" class="wide">+1 Roulette Bonus</button>
 
         <details class="manage">
           <summary>Manage Roulette</summary>
@@ -309,6 +311,6 @@
     </div>
   </section>
 
-  <script src="app.js?v=20"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>

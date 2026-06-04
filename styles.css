@@ -1024,3 +1024,8 @@ input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(255,120,186,.12)}
 .certificate-grid b{
   color:var(--pink2);
 }
+
+/* V21 engagement redesign */
+.v21-extra-controls{margin-top:12px;display:grid;gap:8px;padding:12px;border-radius:22px;border:1px solid var(--line);background:rgba(255,255,255,.68)}
+.v21-extra-controls button:disabled{opacity:.45;cursor:not-allowed}.v21-penalty-note,.v21-roulette-done{padding:9px 10px;border-radius:16px;background:rgba(255,232,243,.74);color:var(--pink2);font-weight:900;font-size:.88rem;text-align:center}
+.rsbd-countdown-card{margin:12px 0;padding:14px 16px;border-radius:26px;text-align:center;border:1px solid rgba(255,255,255,.82);background:linear-gradient(135deg,rgba(255,232,243,.92),rgba(244,238,255,.92));box-shadow:0 14px 34px rgba(237,76,151,.13);animation:rsbdCountdownPulse 3.4s ease-in-out infinite}.rsbd-countdown-card.hidden{display:none}.rsbd-count-main{font-weight:1000;color:var(--pink2);letter-spacing:.04em}.rsbd-count-date{margin-top:4px;color:var(--muted);font-weight:800;font-size:.9rem}.rsbd-countdown-card.near{box-shadow:0 0 24px rgba(255,120,186,.22)}.rsbd-countdown-card.soon{border-color:rgba(250,204,21,.45);box-shadow:0 0 30px rgba(250,204,21,.22)}.rsbd-countdown-card.urgent,.rsbd-countdown-card.tomorrow{background:linear-gradient(135deg,rgba(250,204,21,.26),rgba(255,120,186,.35));box-shadow:0 0 38px rgba(250,204,21,.34),0 16px 34px rgba(237,76,151,.18);animation:rsbdCountdownPulse 1.5s ease-in-out infinite}@keyframes rsbdCountdownPulse{0%,100%{transform:scale(1);filter:brightness(1)}50%{transform:scale(1.012);filter:brightness(1.04)}}
