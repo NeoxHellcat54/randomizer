@@ -680,7 +680,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=21").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=22").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -987,19 +987,11 @@ function adjudicatePreviousRolledDayIfNeeded(){
   const r = data.todayResults;
   if(!r || !r.date || data.adjudicatedDates[r.date] || r.date === localDateString()) return;
   const incomplete = (r.tasks || []).filter(t=>!t.complete).length;
-  if(incomplete > 0) data.pointPenaltyDebt = Number(data.pointPenaltyDebt || 0) + incomplete * 2;
+  if(incomplete > 0 && typeof v22AddPointPenaltyDebt === "function") v22AddPointPenaltyDebt(incomplete * 2);
   data.adjudicatedDates[r.date] = true;
 }
 function processSkippedDays(){
-  const t = localDateString();
-  if(!data.lastSeenDate){ data.lastSeenDate = t; return; }
-  const daysAbsent = Math.floor((parseLocalDate(t)-parseLocalDate(data.lastSeenDate))/86400000);
-  if(daysAbsent >= 3){ addPunishmentBar(2 + Math.floor((daysAbsent-3)/2)); }
-  for(let i=0;i<Math.max(0,daysAbsent);i++){
-    decrementDailyEffects();
-    if(activeEffect("dailyPunishmentAdd")) addPunishmentBar(activeEffect("dailyPunishmentAdd"));
-  }
-  data.lastSeenDate = t;
+  data.lastSeenDate ??= localDateString();
 }
 
 function rollAllSystems(){
@@ -3689,140 +3681,215 @@ save();
 render();
 
 
-/* =========================
-   V21 Engagement Redesign
-========================= */
-function ensureV21Data(){
+/* V22 System Redesign */
+function ensureV22Data(){
+  data.orgasm ??= {todayDate:localDateString(),todayReal:0,weekStartDate:localDateString(),weekTotal:0,weekDaysFinalized:0,lifetimeReal:0,skippedDays:0,lastFinalizedDate:null,pendingReviews:[]};
+  data.vacation ??= {scheduled:false,active:false,startDate:null,endDate:null,days:0,daysUsed:0};
   data.pointPenaltyDebt ??= 0;
   data.lastTaskSetId ??= null;
   data.currentTaskSetRewarded ??= false;
   data.rollMoreCountToday ??= 0;
-  data.rouletteRewardUsedDate ??= null;
-  data.rouletteRewardPending ??= null;
+  data.rouletteRewards ??= {date:localDateString(),rolls:[],active:null};
+  if(data.contractStats){
+    data.contractStats.vacationDaysUsed ??= 0;
+    data.contractStats.lifetimeOrgasms ??= 0;
+    data.contractStats.skippedDays ??= 0;
+  }
 }
-function v21NewTaskSet(tasks){
-  ensureV21Data();
-  data.lastTaskSetId = uid();
-  data.currentTaskSetRewarded = false;
-  return (tasks || []).map(t => ({...t, setId:data.lastTaskSetId, rewardCounted:false}));
+function v22DateAdd(dateStr, days){const d=parseLocalDate(dateStr);d.setDate(d.getDate()+days);return formatDate(d);}
+function v22DaysBetween(a,b){return Math.floor((parseLocalDate(b)-parseLocalDate(a))/86400000);}
+function v22IsVacationDate(dateStr){ensureV22Data();return !!(data.vacation.startDate&&data.vacation.endDate&&parseLocalDate(dateStr)>=parseLocalDate(data.vacation.startDate)&&parseLocalDate(dateStr)<=parseLocalDate(data.vacation.endDate));}
+function v22DailyPoints(count){return (2-Number(count||0))*25;}
+function v22WeeklyInterval(total){return total===0?0:Math.ceil(Number(total||0)/5);}
+function v22WeeklyPoints(total){return Math.round(1000-(v22WeeklyInterval(total)*333.33));}
+function v22WeeklyBars(total){
+  if(total===0)return{reward:3,punishment:0};
+  if(total<=5)return{reward:2,punishment:0};
+  if(total<=10)return{reward:1,punishment:0};
+  if(total<=15)return{reward:0,punishment:0};
+  return{reward:0,punishment:Math.ceil((total-15)/5)};
 }
-function v21AllCurrentTasksComplete(){
-  const tasks = data.todayResults?.tasks || [];
-  return tasks.length > 0 && tasks.every(t=>t.complete);
+function v22ApplyPointDelta(amount){
+  amount=Math.round(Number(amount)||0);
+  data.points+=amount;
+  if(amount>0){data.lifetimePoints+=amount;if(data.contract?.signed&&!data.contract?.fulfilled)data.contractStats.totalPointsEarned+=amount;}
 }
-function v21ApplyPointPenalty(basePoints, taskCount){
-  let total=0, debt=Number(data.pointPenaltyDebt||0), per=taskCount?basePoints/taskCount:0;
-  for(let i=0;i<taskCount;i++){ if(debt>0){ total += per*.75; debt--; } else total += per; }
-  data.pointPenaltyDebt=Math.max(0,debt);
-  return Math.round(total);
+function v22AddPointPenaltyDebt(amount){
+  ensureV22Data();
+  data.pointPenaltyDebt=Number(data.pointPenaltyDebt||0)+Number(amount||0);
+  while(data.pointPenaltyDebt>=10){data.pointPenaltyDebt-=10;data.points-=500;addPunishmentBar(1);}
+}
+function v22FinalizeDay(dateStr, opts={}){
+  ensureV22Data();
+  if(v22IsVacationDate(dateStr))return;
+  const skipped=!!opts.skipped;
+  const real=(dateStr===data.orgasm.todayDate)?Number(data.orgasm.todayReal||0):0;
+  const virtual=skipped?4:0;
+  const dailyPoints=v22DailyPoints(real);
+  v22ApplyPointDelta(dailyPoints);
+  data.orgasm.weekTotal+=real+virtual;
+  data.orgasm.weekDaysFinalized+=1;
+  if(skipped){data.orgasm.skippedDays+=1;if(data.contractStats)data.contractStats.skippedDays=data.orgasm.skippedDays;addPunishmentBar(1);}
+  data.orgasm.pendingReviews.push({type:"daily",date:dateStr,real,skipped,virtual,points:dailyPoints});
+  if(data.orgasm.weekDaysFinalized>=7){
+    const total=Number(data.orgasm.weekTotal||0), pts=v22WeeklyPoints(total), bars=v22WeeklyBars(total);
+    v22ApplyPointDelta(pts);
+    for(let i=0;i<bars.reward;i++)advanceRewardPathProgress();
+    if(bars.punishment)addPunishmentBar(bars.punishment);
+    data.orgasm.pendingReviews.push({type:"weekly",total,points:pts,reward:bars.reward,punishment:bars.punishment});
+    data.orgasm.weekTotal=0;data.orgasm.weekDaysFinalized=0;data.orgasm.weekStartDate=v22DateAdd(dateStr,1);
+  }
+}
+function v22FinalizeMissingDays(){
+  ensureV22Data();
+  const t=localDateString();
+  if(!data.orgasm.lastFinalizedDate)data.orgasm.lastFinalizedDate=v22DateAdd(t,-1);
+  let d=v22DateAdd(data.orgasm.lastFinalizedDate,1);
+  while(parseLocalDate(d)<parseLocalDate(t)){
+    const rolled=data.lastRollDate===d;
+    v22FinalizeDay(d,{rolled,skipped:!rolled});
+    data.orgasm.lastFinalizedDate=d;
+    d=v22DateAdd(d,1);
+  }
+  if(data.orgasm.todayDate!==t){data.orgasm.todayDate=t;data.orgasm.todayReal=0;}
+}
+function v22RecordOrgasm(){
+  ensureV22Data();v22FinalizeMissingDays();
+  data.orgasm.todayReal+=1;data.orgasm.lifetimeReal+=1;
+  if(data.contractStats)data.contractStats.lifetimeOrgasms=data.orgasm.lifetimeReal;
+  save();render();
+}
+window.v22RecordOrgasm=v22RecordOrgasm;
+function v22ShowPendingReviews(){
+  if(!data.orgasm?.pendingReviews?.length)return;
+  const msg=data.orgasm.pendingReviews.map(r=>r.type==="daily"?`Daily Review ${r.date}\nReal Orgasms: ${r.real}\n${r.skipped?"Skipped Day: +4 weekly virtual orgasms\n":""}Points: ${r.points>=0?"+":""}${r.points}`:`Weekly Review\nWeekly Total: ${r.total}\nPoints: ${r.points>=0?"+":""}${r.points}\n${r.reward?("+"+r.reward+" Reward Progress"):(r.punishment?("+"+r.punishment+" Punishment Bar"):"No bar effect")}`).join("\n\n");
+  data.orgasm.pendingReviews=[];save();setTimeout(()=>alert(msg),100);
+}
+function v22ScheduleVacation(){
+  if(data.vacation.scheduled||data.vacation.active)return alert("A vacation is already scheduled or active.");
+  const days=Math.floor(Number(document.getElementById("vacationDaysInput")?.value||0));
+  if(days<1)return alert("Enter a vacation length of at least 1 day.");
+  const start=v22DateAdd(localDateString(),1), end=v22DateAdd(start,days-1);
+  data.vacation={scheduled:true,active:false,startDate:start,endDate:end,days,daysUsed:data.vacation.daysUsed||0};
+  save();render();
+}
+window.v22ScheduleVacation=v22ScheduleVacation;
+function v22CancelVacation(){
+  if(data.vacation.active)return alert("Active vacation cannot be cancelled.");
+  data.vacation={scheduled:false,active:false,startDate:null,endDate:null,days:0,daysUsed:data.vacation.daysUsed||0};
+  save();render();
+}
+window.v22CancelVacation=v22CancelVacation;
+function v22UpdateVacationState(){
+  const t=localDateString();
+  if(data.vacation.scheduled&&parseLocalDate(t)>=parseLocalDate(data.vacation.startDate)){data.vacation.scheduled=false;data.vacation.active=true;}
+  if(data.vacation.active&&parseLocalDate(t)>parseLocalDate(data.vacation.endDate)){
+    data.vacation.active=false;data.vacation.daysUsed+=Number(data.vacation.days||0);
+    if(data.contractStats)data.contractStats.vacationDaysUsed=data.vacation.daysUsed;
+    data.vacation.startDate=null;data.vacation.endDate=null;data.vacation.days=0;
+  }
+}
+function v22RemoveGameUpgrade(){
+  if(typeof UPGRADE_DEFS!=="undefined"){const idx=UPGRADE_DEFS.findIndex(u=>u.id==="gameDouble");if(idx>=0)UPGRADE_DEFS.splice(idx,1);}
+  if(data.upgrades)delete data.upgrades.gameDouble;
+}
+function v22NewTaskSet(tasks){data.lastTaskSetId=uid();data.currentTaskSetRewarded=false;return(tasks||[]).map(t=>({...t,setId:data.lastTaskSetId}));}
+function v22AllCurrentTasksComplete(){const tasks=data.todayResults?.tasks||[];return tasks.length>0&&tasks.every(t=>t.complete);}
+function v22ApplyPointPenaltyToTaskPoints(basePoints, taskCount){
+  let total=0,debt=Number(data.pointPenaltyDebt||0),per=taskCount?basePoints/taskCount:0;
+  for(let i=0;i<taskCount;i++){if(debt>0){total+=per*.75;debt--;}else total+=per;}
+  data.pointPenaltyDebt=Math.max(0,debt);return Math.round(total);
 }
 function calculateTaskPoints(tasks){
   const raw=tasks.reduce((s,t)=>s+Number(t.pointsBase??75),0);
-  const base=v21ApplyPointPenalty(raw,tasks.length);
-  return Math.round(base*(1+(upgradeLevel('pointMultiplier')*.015))*combinedEffectMult('pointGainMult',1));
+  const base=v22ApplyPointPenaltyToTaskPoints(raw,tasks.length);
+  return Math.round(base*(1+(upgradeLevel("pointMultiplier")*.015))*combinedEffectMult("pointGainMult",1));
 }
-function v21RouletteRewardAmount(entry){ return Math.round(10000/Math.max(1,Number(entry?.weight)||1)); }
-function v21RollTaskSet(){ return v21NewTaskSet(rollTasks()); }
-
 function v194RunCoreRoll(){
-  ensureV21Data();
-  const t=typeof localDateString==='function'?localDateString():today();
-  if(data.theEndUnlocked) return false;
-  if(data.lastRollDate===t){ alert("Today's Roll All has already been used."); return false; }
-  if(typeof adjudicatePreviousRolledDayIfNeeded==='function') adjudicatePreviousRolledDayIfNeeded();
-  const rsbd=typeof isRSBD==='function'?isRSBD(t):false;
-  const results={date:t,rsbd};
-  const chastityChance=(typeof rewardEffect==='function'&&rewardEffect('chastityZero'))?0:data.chastityProbability;
+  ensureV22Data();v22UpdateVacationState();v22FinalizeMissingDays();
+  const t=localDateString();
+  if(data.theEndUnlocked)return false;
+  if(data.lastRollDate===t){alert("Today's Roll All has already been used.");return false;}
+  adjudicatePreviousRolledDayIfNeeded();
+  const rsbd=isRSBD(t), results={date:t,rsbd};
+  const chastityChance=rewardEffect("chastityZero")?0:data.chastityProbability;
   const chastityYes=rsbd?true:chance(chastityChance);
-  results.chastity={result:chastityYes?'YES':'NO',cage:null};
-  if(chastityYes){ const cage=weightedRoll(data.cages); results.chastity.cage=cage?cage.name:'No cage configured'; }
-  else data.chastityProbability += typeof chastityIncreaseAmount==='function'?chastityIncreaseAmount():1;
-  const contentRolls=((typeof rewardEffect==='function'&&rewardEffect('contentDoubleGuaranteed'))||chance(typeof upgradeLevel==='function'?upgradeLevel('contentDouble'):0))?2:1;
-  const cr=[]; for(let i=0;i<contentRolls;i++){ const c=weightedRoll(data.content); cr.push(c?c.name:'No content configured'); }
-  results.content=cr.join(' + '); results.game='';
-  results.tasks=rsbd&&typeof rsbdFillExactlySevenTasks==='function'?v21NewTaskSet(rsbdFillExactlySevenTasks()):v21RollTaskSet();
-  results.outfits=typeof rollOutfits==='function'?rollOutfits(rsbd):[];
-  results.roulette={triggered:false,optional:true};
-  data.lastRollDate=t; data.lastSeenDate=t; data.rewardGrantedDate=null; data.rollMoreCountToday=0; data.rouletteRewardUsedDate=null; data.rouletteRewardPending=null; data.todayResults=results;
-  if(data.contract?.signed&&!data.contract?.fulfilled){ data.contractStats.totalRolls+=1; data.contractStats.totalTasksGenerated+=(results.tasks||[]).length; }
-  save(); render(); return true;
+  results.chastity={result:chastityYes?"YES":"NO",cage:null};
+  if(chastityYes){const cage=weightedRoll(data.cages);results.chastity.cage=cage?cage.name:"No cage configured";}else data.chastityProbability+=chastityIncreaseAmount();
+  const contentRolls=(rewardEffect("contentDoubleGuaranteed")||chance(upgradeLevel("contentDouble")))?2:1;
+  const cr=[];for(let i=0;i<contentRolls;i++){const c=weightedRoll(data.content);cr.push(c?c.name:"No content configured");}
+  results.content=cr.join(" + ");results.game="";
+  results.tasks=rsbd?v22NewTaskSet(rsbdFillExactlySevenTasks()):v22NewTaskSet(rollTasks());
+  results.outfits=rollOutfits(rsbd);results.roulette={triggered:false,optional:true};
+  data.lastRollDate=t;data.lastSeenDate=t;data.rewardGrantedDate=null;data.rollMoreCountToday=0;data.currentTaskSetRewarded=false;
+  data.rouletteRewards={date:t,rolls:[],active:null};data.todayResults=results;
+  if(data.contract?.signed&&!data.contract?.fulfilled){data.contractStats.totalRolls+=1;data.contractStats.totalTasksGenerated+=results.tasks.length;}
+  save();render();v22ShowPendingReviews();return true;
 }
-function v21RollMoreTasks(){
-  ensureV21Data();
-  if(!data.todayResults||data.lastRollDate!==localDateString()) return alert('Roll All first.');
-  if(!v21AllCurrentTasksComplete()) return alert('Complete the current task set before rolling more tasks.');
-  const tasks=v21RollTaskSet();
-  data.todayResults.tasks=tasks; data.rollMoreCountToday=Number(data.rollMoreCountToday||0)+1; data.currentTaskSetRewarded=false;
-  if(data.contract?.signed&&!data.contract?.fulfilled) data.contractStats.totalTasksGenerated += tasks.length;
-  save(); render(); if(typeof playRollAnimation==='function') setTimeout(playRollAnimation,120);
+function v22RollMoreTasks(){
+  if(!data.todayResults||data.lastRollDate!==localDateString())return alert("Roll All first.");
+  if(!v22AllCurrentTasksComplete())return alert("Complete the current task set before rolling more tasks.");
+  const tasks=v22NewTaskSet(rollTasks());data.todayResults.tasks=tasks;data.currentTaskSetRewarded=false;data.rollMoreCountToday=Number(data.rollMoreCountToday||0)+1;
+  if(data.contract?.signed&&!data.contract?.fulfilled)data.contractStats.totalTasksGenerated+=tasks.length;
+  save();render();if(typeof playRollAnimation==="function")setTimeout(playRollAnimation,120);
 }
-window.v21RollMoreTasks=v21RollMoreTasks;
-function v21RollRouletteReward(){
-  ensureV21Data();
-  if(!data.todayResults||data.lastRollDate!==localDateString()) return alert('Roll All first.');
-  if(!v21AllCurrentTasksComplete()) return alert('Complete the current task set before rolling roulette.');
-  if(data.rouletteRewardUsedDate===localDateString()) return alert('Roulette reward has already been used today.');
-  if(!data.roulette.entries.length) return alert('No roulette entries configured.');
-  const picked=weightedRoll(data.roulette.entries); if(!picked) return alert('No valid roulette entry configured.');
-  const reward=v21RouletteRewardAmount(picked);
-  data.rouletteRewardUsedDate=localDateString(); data.rouletteRewardPending={id:uid(),name:picked.name,url:picked.url,weight:Number(picked.weight)||1,reward,complete:false};
-  try{ const w=window.open('about:blank','_blank'); if(w) w.location.href=picked.url; else window.open(picked.url,'_blank'); }catch(e){ window.open(picked.url,'_blank'); }
-  save(); render();
+window.v22RollMoreTasks=v22RollMoreTasks;
+function v22RouletteRewardAmount(entry){return Math.round(10000/Math.max(1,Number(entry?.weight)||1));}
+function v22ResetRouletteIfNewDay(){if(!data.rouletteRewards||data.rouletteRewards.date!==localDateString())data.rouletteRewards={date:localDateString(),rolls:[],active:null};}
+function v22RollRouletteReward(existingId=null){
+  v22ResetRouletteIfNewDay();
+  if(!data.todayResults||data.lastRollDate!==localDateString())return alert("Roll All first.");
+  if(!v22AllCurrentTasksComplete())return alert("Complete current tasks before rolling roulette.");
+  if(data.rouletteRewards.rolls.length>=3&&!existingId)return alert("All 3 roulette rolls have been used today.");
+  if(!data.roulette.entries.length)return alert("No roulette entries configured.");
+  let roll=existingId?data.rouletteRewards.rolls.find(r=>r.id===existingId):null;
+  if(existingId&&(!roll||roll.rerolled))return alert("This roulette roll cannot be rerolled.");
+  const picked=weightedRoll(data.roulette.entries), reward=v22RouletteRewardAmount(picked);
+  const obj={id:existingId||uid(),name:picked.name,url:picked.url,weight:Number(picked.weight)||1,reward,complete:false,rerolled:!!existingId};
+  if(existingId){const idx=data.rouletteRewards.rolls.findIndex(r=>r.id===existingId);data.rouletteRewards.rolls[idx]=obj;}else data.rouletteRewards.rolls.push(obj);
+  try{const w=window.open("about:blank","_blank"); if(w)w.location.href=obj.url; else window.open(obj.url,"_blank");}catch(e){window.open(obj.url,"_blank");}
+  save();render();
 }
-window.v21RollRouletteReward=v21RollRouletteReward;
-function v21CompleteRouletteReward(){
-  ensureV21Data(); const r=data.rouletteRewardPending; if(!r||r.complete) return;
-  r.complete=true; data.points+=Number(r.reward)||0; data.lifetimePoints+=Math.max(0,Number(r.reward)||0);
-  if(data.contract?.signed&&!data.contract?.fulfilled) data.contractStats.totalPointsEarned+=Math.max(0,Number(r.reward)||0);
-  save(); render(); alert(`Roulette completed. You earned ${Number(r.reward||0).toLocaleString()} points.`);
+window.v22RollRouletteReward=v22RollRouletteReward;
+function v22CompleteRouletteReward(id){
+  v22ResetRouletteIfNewDay();const r=data.rouletteRewards.rolls.find(x=>x.id===id);
+  if(!r||r.complete)return;r.complete=true;data.points+=Number(r.reward)||0;data.lifetimePoints+=Math.max(0,Number(r.reward)||0);
+  if(data.contract?.signed&&!data.contract?.fulfilled)data.contractStats.totalPointsEarned+=Math.max(0,Number(r.reward)||0);
+  save();render();alert(`Roulette completed. You earned ${Number(r.reward||0).toLocaleString()} points.`);
 }
-window.v21CompleteRouletteReward=v21CompleteRouletteReward;
+window.v22CompleteRouletteReward=v22CompleteRouletteReward;
 window.toggleTodayTask=(taskId,checked)=>{
-  ensureV21Data();
-  const tasks=data.todayResults?.tasks||[]; const task=tasks.find(x=>x.id===taskId);
-  if(task){ const was=!!task.complete; task.complete=checked; if(checked&&!was&&data.contract?.signed&&!data.contract?.fulfilled){ data._contractCompletedTaskIds??=[]; if(!data._contractCompletedTaskIds.includes(taskId)){ data._contractCompletedTaskIds.push(taskId); data.contractStats.totalTasksCompleted+=1; } } }
-  const allDone=tasks.length&&tasks.every(x=>x.complete); const t=localDateString();
+  const tasks=data.todayResults?.tasks||[],task=tasks.find(x=>x.id===taskId);
+  if(task){const was=!!task.complete;task.complete=checked;if(checked&&!was&&data.contract?.signed&&!data.contract?.fulfilled){data._contractCompletedTaskIds??=[];if(!data._contractCompletedTaskIds.includes(taskId)){data._contractCompletedTaskIds.push(taskId);data.contractStats.totalTasksCompleted+=1;}}}
+  const allDone=tasks.length&&tasks.every(x=>x.complete), t=localDateString();
   if(allDone&&!data.currentTaskSetRewarded){
-    if(data.todayResults?.rsbd){ data.currentTaskSetRewarded=true; increaseStreakAndAward(); consumeCompletedDayRewardEffects(); alert('RSBD task set complete. No points and no reward progress are gained today.'); }
-    else { let earned=calculateTaskPoints(tasks); earned=Math.round(earned*consumeTaskRewardMultiplier(tasks.length)); data.points+=earned; data.lifetimePoints+=Math.max(0,earned); if(data.contract?.signed&&!data.contract?.fulfilled) data.contractStats.totalPointsEarned+=Math.max(0,earned); if(!activeEffect('rewardFrozen')) advanceRewardPathProgress(); if(data.rewardGrantedDate!==t){ increaseStreakAndAward(); consumeCompletedDayRewardEffects(); data.rewardGrantedDate=t; } data.currentTaskSetRewarded=true; alert(`Task set complete. You earned ${earned} points. Reward progress increased by 1.`); }
+    if(data.todayResults?.rsbd){data.currentTaskSetRewarded=true;increaseStreakAndAward();consumeCompletedDayRewardEffects();alert("RSBD task set complete. No points and no reward progress are gained today.");}
+    else{let earned=calculateTaskPoints(tasks);earned=Math.round(earned*consumeTaskRewardMultiplier(tasks.length));data.points+=earned;data.lifetimePoints+=Math.max(0,earned);
+      if(data.contract?.signed&&!data.contract?.fulfilled)data.contractStats.totalPointsEarned+=Math.max(0,earned);
+      if(!activeEffect("rewardFrozen"))advanceRewardPathProgress();
+      if(data.rewardGrantedDate!==t){increaseStreakAndAward();consumeCompletedDayRewardEffects();data.rewardGrantedDate=t;}
+      data.currentTaskSetRewarded=true;alert(`Task set complete. You earned ${earned} points. Reward progress increased by 1.`);
+    }
   }
-  save(); render();
+  save();render();
 };
-function v21NextRSBDInfo(){
-  if(typeof ensureRSBDYear!=='function') return null;
-  const ts=localDateString(), td=parseLocalDate(ts), years=[td.getFullYear(),td.getFullYear()+1];
-  let c=[]; years.forEach(y=>c.push(...(ensureRSBDYear(y)||[]))); c=c.sort();
-  const next=c.find(d=>parseLocalDate(d)>=td); if(!next) return null;
-  return {date:next, days:Math.floor((parseLocalDate(next)-td)/86400000)};
-}
-function v21PrettyDate(s){ return parseLocalDate(s).toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'}); }
-function renderRSBDCountdown(){
-  const card=document.getElementById('rsbdCountdownCard'); if(!card) return; const info=v21NextRSBDInfo();
-  if(!info||info.days===0){ card.classList.add('hidden'); return; }
-  let label=`✨ NEXT RSBD IN ${info.days} DAYS ✨`, level='far';
-  if(info.days===1){ label='✨ RSBD TOMORROW ✨'; level='tomorrow'; } else if(info.days<=3){ label=`⚠ RSBD IN ${info.days} DAYS ⚠`; level='urgent'; } else if(info.days<=7) level='soon'; else if(info.days<=30) level='near';
-  card.className=`rsbd-countdown-card ${level}`; card.innerHTML=`<div class="rsbd-count-main">${label}</div><div class="rsbd-count-date">${v21PrettyDate(info.date)}</div>`;
-}
-function renderV21Buttons(){
-  ensureV21Data();
-  const el=document.getElementById('results');
-  if(el&&data.todayResults){
-    const old=el.querySelector('.v21-extra-controls'); if(old) old.remove();
-    const can=v21AllCurrentTasksComplete()&&data.lastRollDate===localDateString();
-    const rouletteDone=data.rouletteRewardUsedDate===localDateString(); const pending=data.rouletteRewardPending&&!data.rouletteRewardPending.complete;
-    const controls=document.createElement('div'); controls.className='v21-extra-controls'; controls.innerHTML=`
-      <button onclick="v21RollMoreTasks()" ${can?'':'disabled'}>Roll More Tasks</button>
-      <button onclick="v21RollRouletteReward()" ${can&&!rouletteDone?'':'disabled'}>Roll Roulette Reward</button>
-      ${pending?`<button class="claim" onclick="v21CompleteRouletteReward()">Complete Roulette: +${Number(data.rouletteRewardPending.reward||0).toLocaleString()} points</button>`:''}
-      ${data.rouletteRewardPending?.complete?`<div class="v21-roulette-done">Roulette reward completed: +${Number(data.rouletteRewardPending.reward||0).toLocaleString()} points</div>`:''}
-      ${data.pointPenaltyDebt?`<div class="v21-penalty-note">Point penalty debt: next ${data.pointPenaltyDebt} completed task${data.pointPenaltyDebt===1?'':'s'} worth 75%.</div>`:''}`;
-    el.appendChild(controls);
-  }
-  renderRSBDCountdown();
-}
 function renderRoulette(){
-  rouletteBase.textContent='Optional'; rouletteTax.textContent='Reward'; rouletteEffective.textContent='10000 / Weight';
-  rouletteList.innerHTML=data.roulette.entries.map(item=>`<div class="item"><div><b>${esc(item.name)}</b><div class="muted">${esc(item.url)}</div><div class="muted">Weight: ${esc(item.weight)} · Reward: ${v21RouletteRewardAmount(item).toLocaleString()} points</div></div><div class="item-actions"><input type="number" min="1" value="${esc(item.weight)}" onchange="updateRoulette('${item.id}','weight',this.value)"><button class="delete" onclick="deleteRoulette('${item.id}')">Delete</button></div></div>`).join('')||`<div class="muted">No roulette entries yet.</div>`;
+  rouletteBase.textContent="Optional"; rouletteTax.textContent="3/day"; rouletteEffective.textContent="10000 / Weight";
+  rouletteList.innerHTML=data.roulette.entries.map(item=>`<div class="item"><div><b>${esc(item.name)}</b><div class="muted">${esc(item.url)}</div><div class="muted">Weight: ${esc(item.weight)} · Reward: ${v22RouletteRewardAmount(item).toLocaleString()} points</div></div><div class="item-actions"><input type="number" min="1" value="${esc(item.weight)}" onchange="updateRoulette('${item.id}','weight',this.value)"><button class="delete" onclick="deleteRoulette('${item.id}')">Delete</button></div></div>`).join("")||`<div class="muted">No roulette entries yet.</div>`;
 }
-const oldRenderV21=render; render=function(){ oldRenderV21(); renderV21Buttons(); };
-ensureV21Data(); save(); render();
+function v22NextRSBDInfo(){const todayStr=localDateString(),todayDate=parseLocalDate(todayStr);let candidates=[];[todayDate.getFullYear(),todayDate.getFullYear()+1].forEach(y=>candidates.push(...(ensureRSBDYear(y)||[])));candidates=candidates.sort();const next=candidates.find(d=>parseLocalDate(d)>=todayDate);return next?{date:next,days:Math.floor((parseLocalDate(next)-todayDate)/86400000)}:null;}
+function v22PrettyDate(dateStr){return parseLocalDate(dateStr).toLocaleDateString(undefined,{year:"numeric",month:"long",day:"numeric"});}
+function renderV22Dashboard(){
+  ensureV22Data();v22UpdateVacationState();
+  const org=document.getElementById("orgasmDashboardCard");
+  if(org)org.innerHTML=`<div class="screen-head"><div><span class="tiny">Counter</span><h2>Orgasms</h2></div><button onclick="v22RecordOrgasm()">+1 Orgasm</button></div><div class="orgasm-grid"><div><span>Today</span><b>${data.orgasm.todayReal}</b></div><div><span>This Week</span><b>${data.orgasm.weekTotal}</b></div><div><span>All-Time Orgasms</span><b>${data.orgasm.lifetimeReal}</b></div><div><span>Skipped Days</span><b>${data.orgasm.skippedDays}</b></div></div>`;
+  const vac=document.getElementById("vacationDashboardCard");
+  if(vac){let state=`<div class="muted">No vacation scheduled.</div>`; if(data.vacation.scheduled)state=`<b>Vacation Scheduled</b><div class="muted">Starts ${v22PrettyDate(data.vacation.startDate)} · Ends ${v22PrettyDate(data.vacation.endDate)}</div><button onclick="v22CancelVacation()">Cancel Vacation</button>`; else if(data.vacation.active){const rem=Math.max(0,v22DaysBetween(localDateString(),data.vacation.endDate)+1);state=`<b>Vacation Active</b><div class="muted">${rem} day${rem===1?"":"s"} remaining. Attendance/orgasm reviews are paused.</div>`;} vac.innerHTML=`<div class="screen-head"><div><span class="tiny">Pause</span><h2>Vacation</h2></div></div>${state}${(!data.vacation.scheduled&&!data.vacation.active)?`<div class="inline-form"><input id="vacationDaysInput" type="number" min="1" placeholder="Days"><button onclick="v22ScheduleVacation()">Schedule Vacation</button></div>`:""}<div class="muted">Vacation Days Used: ${Number(data.vacation.daysUsed||0).toLocaleString()}</div>`;}
+  const rsbd=document.getElementById("rsbdCountdownCard");
+  if(rsbd){const info=v22NextRSBDInfo(); if(!info||info.days===0)rsbd.classList.add("hidden"); else{let label=`✨ NEXT RSBD IN ${info.days} DAYS ✨`,level="far"; if(info.days===1){label="✨ RSBD TOMORROW ✨";level="tomorrow";}else if(info.days<=3){label=`⚠ RSBD IN ${info.days} DAYS ⚠`;level="urgent";}else if(info.days<=7)level="soon";else if(info.days<=30)level="near";rsbd.className=`rsbd-countdown-card ${level}`;rsbd.innerHTML=`<div class="rsbd-count-main">${label}</div><div class="rsbd-count-date">${v22PrettyDate(info.date)}</div>`;}}
+  const resultsEl=document.getElementById("results");
+  if(resultsEl&&data.todayResults){let old=resultsEl.querySelector(".v22-extra-controls");if(old)old.remove();const can=v22AllCurrentTasksComplete()&&data.lastRollDate===localDateString();v22ResetRouletteIfNewDay();const rolls=data.rouletteRewards.rolls||[];const c=document.createElement("div");c.className="v22-extra-controls";c.innerHTML=`<button onclick="v22RollMoreTasks()" ${can?"":"disabled"}>Roll More Tasks</button><button onclick="v22RollRouletteReward()" ${can&&rolls.length<3?"":"disabled"}>Roll Roulette Reward (${rolls.length}/3)</button>${rolls.map(r=>`<div class="roulette-reward-card"><b>${esc(r.name)}</b><span>Reward: ${Number(r.reward||0).toLocaleString()} points · Weight ${esc(r.weight)}</span><div class="row"><button onclick="v22RollRouletteReward('${r.id}')" ${r.rerolled||r.complete?"disabled":""}>Reroll</button><button class="claim" onclick="v22CompleteRouletteReward('${r.id}')" ${r.complete?"disabled":""}>${r.complete?"Completed":"Mark Complete"}</button></div></div>`).join("")}${data.pointPenaltyDebt?`<div class="v22-penalty-note">Point penalty debt: next ${data.pointPenaltyDebt} completed task${data.pointPenaltyDebt===1?"":"s"} worth 75%.</div>`:""}`;resultsEl.appendChild(c);}
+}
+if(typeof renderCertificate==="function"){const oldCert=renderCertificate;renderCertificate=function(){let html=oldCert();return html.replace('<span>Highest Streak</span><b>',`<span>Vacation Days Used</span><b>${Number(data.vacation?.daysUsed||0).toLocaleString()}</b><span>All-Time Orgasms</span><b>${Number(data.orgasm?.lifetimeReal||0).toLocaleString()}</b><span>Skipped Days</span><b>${Number(data.orgasm?.skippedDays||0).toLocaleString()}</b><span>Highest Streak</span><b>`);};}
+const oldRenderV22=render;render=function(){oldRenderV22();renderV22Dashboard();};
+ensureV22Data();v22RemoveGameUpgrade();v22UpdateVacationState();v22FinalizeMissingDays();save();render();
