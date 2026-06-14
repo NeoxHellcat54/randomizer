@@ -1,3 +1,5 @@
+function v234EnsureLegacyDOM(){const ids=['cageList', 'chastityBar', 'chastityCageList', 'chastityProb', 'gamesList', 'punishmentBarText', 'punishmentBarValue', 'punishmentList', 'punishmentsList', 'spinWheel', 'upgradesList', 'vacationDaysInput', 'wheelOverlay', 'wheelResult', 'wheelTitle'];let root=document.getElementById('legacyCompat');if(!root){root=document.createElement('div');root.id='legacyCompat';root.className='legacy-compat';document.body.appendChild(root);}ids.forEach(id=>{if(!document.getElementById(id)){const el=document.createElement('div');el.id=id;root.appendChild(el);}})}
+try{if(document.body)v234EnsureLegacyDOM();else document.addEventListener('DOMContentLoaded',v234EnsureLegacyDOM);}catch(e){}
 
 /* V12 cache killer: removes old service workers/caches that may keep stale broken JS/CSS alive. */
 (function(){
@@ -680,7 +682,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=23.3").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=23.4").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -4463,3 +4465,5 @@ render = function(){
 };
 v233LegacyElFallbacks();
 try{ render(); }catch(e){ if(!(String(e).includes("null"))) throw e; }
+
+try{v234EnsureLegacyDOM();}catch(e){}

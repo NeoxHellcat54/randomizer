@@ -1110,3 +1110,13 @@ input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(255,120,186,.12)}
 @media(max-width:520px){
   .market-offers{grid-template-columns:1fr}
 }
+
+/* V23.4 hidden legacy DOM compatibility nodes */
+.legacy-compat{
+  display:none !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+  width:0 !important;
+  height:0 !important;
+  overflow:hidden !important;
+}
