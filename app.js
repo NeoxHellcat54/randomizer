@@ -680,7 +680,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=23.2").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=23.3").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -3498,9 +3498,10 @@ function renderCertificate(){
 }
 
 function renderContract(){
-  ensureV20Data();
-
+  if(typeof ensureV20Data === "function") ensureV20Data();
   const statusEl = document.getElementById("contractStatusText");
+  if(statusEl && typeof contractStatus === "function") statusEl.textContent = contractStatus();
+
   const unsignedBox = document.getElementById("contractUnsignedBox");
   const activeBox = document.getElementById("contractActiveBox");
   const certBox = document.getElementById("certificateBox");
@@ -3508,32 +3509,26 @@ function renderContract(){
   const signedText = document.getElementById("signedContractText");
   const statsBox = document.getElementById("contractStatsBox");
   const certText = document.getElementById("certificateText");
+  const signed = !!data.contract?.signed;
 
-  if(statusEl) statusEl.textContent = contractStatus();
+  if(unsignedBox) unsignedBox.classList.toggle("hidden", signed);
+  if(activeBox) activeBox.classList.toggle("hidden", !signed);
+  if(certBox) certBox.classList.toggle("hidden", !data.contract?.fulfilled);
 
-  const unsigned = !data.contract.signed;
-  if(unsignedBox) unsignedBox.classList.toggle("hidden", !unsigned);
-  if(activeBox) activeBox.classList.toggle("hidden", unsigned);
-  if(certBox) certBox.classList.toggle("hidden", !data.contract.fulfilled);
-
-  if(preview){
+  if(preview && typeof renderContractText === "function"){
     const input = document.getElementById("contractNameInput");
-    const name = input?.value?.trim() || "[NAME]";
-    preview.innerHTML = renderContractText(name, localDateString());
+    preview.innerHTML = renderContractText(input?.value?.trim() || "[NAME]", localDateString());
     if(input && !input.dataset.boundContractPreview){
       input.dataset.boundContractPreview = "1";
       input.addEventListener("input", renderContract);
     }
   }
+  if(signedText && signed && typeof renderContractText === "function") signedText.innerHTML = renderContractText(data.contract.name, data.contract.signedDate);
 
-  if(signedText && data.contract.signed){
-    signedText.innerHTML = renderContractText(data.contract.name, data.contract.signedDate);
-  }
-
-  if(statsBox){
-    const s = data.contractStats || {};
+  if(statsBox && data.contractStats){
+    const s=data.contractStats;
     statsBox.innerHTML = `
-      <div><span>Days Since Signing</span><b>${contractDaysToFreedom().toLocaleString()}</b></div>
+      <div><span>Days Since Signing</span><b>${typeof contractDaysToFreedom==="function"?contractDaysToFreedom().toLocaleString():"0"}</b></div>
       <div><span>Total Rolls</span><b>${Number(s.totalRolls||0).toLocaleString()}</b></div>
       <div><span>Total Tasks Generated</span><b>${Number(s.totalTasksGenerated||0).toLocaleString()}</b></div>
       <div><span>Total Tasks Completed</span><b>${Number(s.totalTasksCompleted||0).toLocaleString()}</b></div>
@@ -3541,23 +3536,14 @@ function renderContract(){
       <div><span>Total Points Spent</span><b>${Number(s.totalPointsSpent||0).toLocaleString()}</b></div>
       <div><span>Rewards Completed</span><b>${Number(s.totalRewardsCompleted||0).toLocaleString()}</b></div>
       <div><span>Punishments Received</span><b>${Number(s.totalPunishmentsReceived||0).toLocaleString()}</b></div>
-      <div><span>Highest Streak</span><b>${Number(data.longestStreak||0).toLocaleString()}</b></div>
-    `;
+      <div><span>Highest Streak</span><b>${Number(data.longestStreak||0).toLocaleString()}</b></div>`;
   }
-
-  if(certText && data.contract.fulfilled){
-    certText.innerHTML = renderCertificate();
-  }
-
+  if(certText && data.contract?.fulfilled && typeof renderCertificate === "function") certText.innerHTML = renderCertificate();
   const signBtn = document.getElementById("signContractBtn");
-  if(signBtn) signBtn.onclick = signContract;
-
-  // Dev tools removed after signing.
-  const devPanel = document.getElementById("devPanel");
-  const devToggle = document.getElementById("devToggle");
-  if(data.contract.signed){
-    if(devPanel) devPanel.remove();
-    if(devToggle) devToggle.remove();
+  if(signBtn && typeof signContract === "function") signBtn.onclick = signContract;
+  if(data.contract?.signed){
+    document.getElementById("devPanel")?.remove();
+    document.getElementById("devToggle")?.remove();
   }
 }
 
@@ -4394,7 +4380,7 @@ function safeClass(id, className, enabled){ const el = safeEl(id); if(el) el.cla
 // Old V1-V22 chastity UI was removed/replaced by Chastity Market.
 // Make any old renderer calls harmless.
 function renderChastity(){
-  if(typeof renderChastityMarket === "function") renderChastityMarket();
+  if(typeof renderChastityMarket === "function") return renderChastityMarket();
 }
 
 // Safer reward renderer. Old builds sometimes expect reward nodes that are missing after tab refactors.
@@ -4446,3 +4432,34 @@ if(typeof render === "function" && !window.__v232RenderGuard){
 try { render(); } catch(e) {
   if(!(String(e).includes("null") || String(e).includes("Cannot set properties of null") || String(e).includes("Cannot read properties of null"))) throw e;
 }
+
+
+/* V23.3 emergency legacy-null renderer rebuild */
+function v233LegacyElFallbacks(){
+  const names = ["rouletteList","rouletteBase","rouletteTax","rouletteEffective","rewardTitle","rewardBar","rewardProgress","rewardLockBadge","rewardPathInfo","rewardDetails"];
+  names.forEach(name=>{
+    try{
+      if(typeof window[name] === "undefined" || window[name] === null){
+        window[name] = {innerHTML:"", textContent:"", value:"", classList:{add(){},remove(){},toggle(){}}};
+      }
+    }catch(e){}
+  });
+}
+v233LegacyElFallbacks();
+
+const oldRenderV233 = render;
+render = function(){
+  v233LegacyElFallbacks();
+  try { return oldRenderV233(); }
+  catch(e){
+    if(String(e).includes("Cannot set properties of null") || String(e).includes("Cannot read properties of null")){
+      console.warn("V23.3 ignored missing legacy element:", e.message);
+      try { renderChastityMarket(); } catch(_e){}
+      try { renderV22Dashboard(); } catch(_e){}
+      return;
+    }
+    throw e;
+  }
+};
+v233LegacyElFallbacks();
+try{ render(); }catch(e){ if(!(String(e).includes("null"))) throw e; }
