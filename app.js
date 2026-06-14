@@ -682,7 +682,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=23.4").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=23.5").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -4467,3 +4467,155 @@ v233LegacyElFallbacks();
 try{ render(); }catch(e){ if(!(String(e).includes("null"))) throw e; }
 
 try{v234EnsureLegacyDOM();}catch(e){}
+
+
+/* V23.5 task points per completion + pretty notifications */
+function prettyNotify(title, message="", type="normal"){
+  let root = document.getElementById("prettyToastRoot");
+  if(!root){
+    root = document.createElement("div");
+    root.id = "prettyToastRoot";
+    root.className = "pretty-toast-root";
+    document.body.appendChild(root);
+  }
+  const card = document.createElement("div");
+  card.className = `pretty-toast ${type}`;
+  card.innerHTML = `
+    <div class="pretty-toast-icon">${type==="good"?"✨":type==="bad"?"⚠":"♡"}</div>
+    <div>
+      <b>${esc(title)}</b>
+      ${message ? `<p>${esc(message)}</p>` : ""}
+    </div>
+  `;
+  root.appendChild(card);
+  setTimeout(()=>card.classList.add("show"), 20);
+  setTimeout(()=>{
+    card.classList.remove("show");
+    setTimeout(()=>card.remove(), 450);
+  }, 3800);
+}
+window.prettyNotify = prettyNotify;
+
+window.alert = function(msg){
+  prettyNotify("Notice", String(msg || ""), "normal");
+};
+
+function v235BaseTaskPoints(task){
+  return Number(task?.pointsBase ?? 75);
+}
+function v235ApplyDebtToSingleTask(points){
+  if(Number(data.pointPenaltyDebt || 0) > 0){
+    data.pointPenaltyDebt = Math.max(0, Number(data.pointPenaltyDebt || 0) - 1);
+    return Math.round(points * 0.75);
+  }
+  return Math.round(points);
+}
+function v235AwardTaskPoints(task){
+  if(!task || task.pointsAwarded) return 0;
+  let earned = v235ApplyDebtToSingleTask(v235BaseTaskPoints(task));
+  earned = Math.round(earned * (1 + (upgradeLevel("pointMultiplier") * 0.015)) * combinedEffectMult("pointGainMult", 1));
+  earned = Math.round(earned * consumeTaskRewardMultiplier(1));
+  task.pointsAwarded = true;
+  task.pointsEarned = earned;
+  data.points += earned;
+  data.lifetimePoints += Math.max(0, earned);
+  if(data.contract?.signed && !data.contract?.fulfilled){
+    data.contractStats.totalPointsEarned += Math.max(0, earned);
+  }
+  return earned;
+}
+
+function calculateTaskPoints(tasks){
+  return (tasks||[]).reduce((s,t)=>s+v235BaseTaskPoints(t),0);
+}
+
+window.toggleTodayTask = (taskId, checked) => {
+  const tasks = data.todayResults?.tasks || [];
+  const task = tasks.find(x=>x.id===taskId);
+  if(!task) return;
+
+  const wasComplete = !!task.complete;
+  task.complete = checked;
+
+  if(checked && !wasComplete){
+    if(data.contract?.signed && !data.contract?.fulfilled){
+      data._contractCompletedTaskIds ??= [];
+      if(!data._contractCompletedTaskIds.includes(taskId)){
+        data._contractCompletedTaskIds.push(taskId);
+        data.contractStats.totalTasksCompleted += 1;
+      }
+    }
+
+    if(data.todayResults?.rsbd){
+      prettyNotify("Task complete", "RSBD tasks give no points.", "normal");
+    } else {
+      const earned = v235AwardTaskPoints(task);
+      prettyNotify("Task complete", `+${earned.toLocaleString()} points`, "good");
+    }
+  }
+
+  const allDone = tasks.length && tasks.every(x=>x.complete);
+  const t = localDateString();
+
+  if(allDone && !data.currentTaskSetRewarded){
+    if(data.todayResults?.rsbd){
+      data.currentTaskSetRewarded = true;
+      increaseStreakAndAward();
+      consumeCompletedDayRewardEffects();
+      prettyNotify("RSBD set complete", "No points and no reward progress are gained today.", "normal");
+    } else {
+      if(!activeEffect("rewardFrozen")) advanceRewardPathProgress();
+
+      if(data.rewardGrantedDate !== t){
+        increaseStreakAndAward();
+        consumeCompletedDayRewardEffects();
+        data.rewardGrantedDate = t;
+      }
+
+      data.currentTaskSetRewarded = true;
+      prettyNotify("Task set complete", "Reward progress increased by 1.", "good");
+    }
+  }
+
+  save();
+  render();
+};
+
+function v22CompleteRouletteReward(id){
+  v22ResetRouletteIfNewDay();
+  const r = data.rouletteRewards.rolls.find(x=>x.id===id);
+  if(!r || r.complete) return;
+  r.complete = true;
+  data.points += Number(r.reward)||0;
+  data.lifetimePoints += Math.max(0, Number(r.reward)||0);
+  if(data.contract?.signed && !data.contract?.fulfilled){
+    data.contractStats.totalPointsEarned += Math.max(0, Number(r.reward)||0);
+  }
+  save(); render();
+  prettyNotify("Roulette complete", `+${Number(r.reward||0).toLocaleString()} points`, "good");
+}
+window.v22CompleteRouletteReward = v22CompleteRouletteReward;
+
+function v23CheckLockComplete(){
+  const c = data.chastityMarket?.activeContract;
+  if(!c || c.status!=="active") return;
+  if(Date.now() >= Number(c.endTime||0)){
+    c.status = "complete";
+    c.codeHidden = false;
+    if(!c.rsbd && Number(c.points)>0){
+      data.points += Number(c.points)||0;
+      data.lifetimePoints += Math.max(0, Number(c.points)||0);
+      if(data.contract?.signed && !data.contract?.fulfilled){
+        data.contractStats.totalPointsEarned += Math.max(0, Number(c.points)||0);
+      }
+    }
+    data.chastityMarket.completedContracts = Number(data.chastityMarket.completedContracts||0)+1;
+    data.chastityMarket.date = null;
+    data.chastityMarket.offers = [];
+    data.chastityMarket.dealer = null;
+    data.chastityMarket.negotiation = null;
+    save();
+    prettyNotify("Lock complete", "Unlock code revealed.", "good");
+  }
+}
+window.v23CheckLockComplete = v23CheckLockComplete;
