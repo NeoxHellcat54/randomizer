@@ -385,7 +385,7 @@ function render(){
   renderOutfits();
   renderResults();
 
-  document.getElementById("chastityProb").textContent = Number(data.chastityProbability).toFixed(data.chastityProbability % 1 ? 1 : 0);
+  safeText("chastityProb", Number(data.chastityProbability).toFixed(data.chastityProbability % 1 ? 1 : 0));
   save();
 }
 function renderReward(){
@@ -680,7 +680,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=23.1").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=23.2").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -4382,4 +4382,67 @@ function renderRoulette(){
       </div>
     </div>
   `).join("") || `<div class="muted">No roulette entries yet.</div>`;
+}
+
+
+/* V23.2 broader null-safe rendering fixes */
+function safeEl(id){ return document.getElementById(id); }
+function safeHTML(id, html){ const el = safeEl(id); if(el) el.innerHTML = html; }
+function safeText(id, txt){ const el = safeEl(id); if(el) el.textContent = txt; }
+function safeClass(id, className, enabled){ const el = safeEl(id); if(el) el.classList.toggle(className, enabled); }
+
+// Old V1-V22 chastity UI was removed/replaced by Chastity Market.
+// Make any old renderer calls harmless.
+function renderChastity(){
+  if(typeof renderChastityMarket === "function") renderChastityMarket();
+}
+
+// Safer reward renderer. Old builds sometimes expect reward nodes that are missing after tab refactors.
+if(typeof renderReward === "function"){
+  const oldRenderRewardV232 = renderReward;
+  renderReward = function(){
+    try { oldRenderRewardV232(); } catch(e) {
+      if(!String(e).includes("null")) throw e;
+    }
+  };
+}
+
+// Safer systems renderers. This prevents removed/renamed markup from killing startup.
+["renderUpgrades","renderPunishments","renderRoulette","renderResults","renderContract","renderV22Dashboard","renderChastityMarket"].forEach(fnName=>{
+  const fn = window[fnName] || (typeof globalThis !== "undefined" ? globalThis[fnName] : null);
+  if(typeof fn === "function"){
+    const old = fn;
+    globalThis[fnName] = function(){
+      try { return old.apply(this, arguments); }
+      catch(e){
+        if(String(e).includes("null") || String(e).includes("Cannot set properties of null") || String(e).includes("Cannot read properties of null")){
+          console.warn(fnName + " skipped missing element:", e.message);
+          return;
+        }
+        throw e;
+      }
+    };
+  }
+});
+
+// Final render wrapper catches old missing element errors without hiding real syntax/logic issues.
+if(typeof render === "function" && !window.__v232RenderGuard){
+  window.__v232RenderGuard = true;
+  const oldRenderV232 = render;
+  render = function(){
+    try { return oldRenderV232(); }
+    catch(e){
+      if(String(e).includes("null") || String(e).includes("Cannot set properties of null") || String(e).includes("Cannot read properties of null")){
+        console.warn("Render skipped missing element:", e.message);
+        try { if(typeof renderChastityMarket === "function") renderChastityMarket(); } catch(_e){}
+        return;
+      }
+      throw e;
+    }
+  };
+}
+
+// Force a guarded render after all definitions.
+try { render(); } catch(e) {
+  if(!(String(e).includes("null") || String(e).includes("Cannot set properties of null") || String(e).includes("Cannot read properties of null"))) throw e;
 }
