@@ -682,7 +682,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=23.7").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=23.8").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -4814,7 +4814,7 @@ function v235AwardTaskPoints(task){
 }
 
 /* Smooth Talker */
-const oldV23AngerGainV237 = typeof v23AngerGain === "function" ? v23AngerGain : null;
+var oldV23AngerGainV237 = typeof v23AngerGain === "function" ? v23AngerGain : null;
 function v23AngerGain(playerOffer, dealerOffer){
   const base = oldV23AngerGainV237 ? oldV23AngerGainV237(playerOffer, dealerOffer) : 0;
   if(v237Effect("smoothTalker")){
@@ -4824,7 +4824,7 @@ function v23AngerGain(playerOffer, dealerOffer){
 }
 
 /* Dealer's Vacation: next market offer selected is accepted instantly */
-const oldV23SelectOfferV237 = typeof v23SelectOffer === "function" ? v23SelectOffer : null;
+var oldV23SelectOfferV237 = typeof v23SelectOffer === "function" ? v23SelectOffer : null;
 function v23SelectOffer(id){
   v23EnsureMarket?.();
   if(data.chastityMarket.activeContract?.status === "active") return alert("Only one active lock contract is allowed.");
@@ -4855,7 +4855,7 @@ function v23SelectOffer(id){
 window.v23SelectOffer = v23SelectOffer;
 
 /* Smooth Talker consumes when a contract is prepared or negotiation closes */
-const oldV23PrepareContractV237 = typeof v23PrepareContract === "function" ? v23PrepareContract : null;
+var oldV23PrepareContractV237 = typeof v23PrepareContract === "function" ? v23PrepareContract : null;
 function v23PrepareContract(offer){
   const r = oldV23PrepareContractV237 ? oldV23PrepareContractV237(offer) : undefined;
   v237ConsumeEffect("smoothTalker");
@@ -4963,11 +4963,11 @@ function v237WeeklyAdjustedTotal(total){
   return (worsenedInterval - 1) * 5 + 1;
 }
 
-const oldV22WeeklyPointsV237 = typeof v22WeeklyPoints === "function" ? v22WeeklyPoints : null;
+var oldV22WeeklyPointsV237 = typeof v22WeeklyPoints === "function" ? v22WeeklyPoints : null;
 function v22WeeklyPoints(total){
   return oldV22WeeklyPointsV237 ? oldV22WeeklyPointsV237(v237WeeklyAdjustedTotal(total)) : Math.round(1000-(Math.ceil(v237WeeklyAdjustedTotal(total)/5)*333.33));
 }
-const oldV22WeeklyBarsV237 = typeof v22WeeklyBars === "function" ? v22WeeklyBars : null;
+var oldV22WeeklyBarsV237 = typeof v22WeeklyBars === "function" ? v22WeeklyBars : null;
 function v22WeeklyBars(total){
   return oldV22WeeklyBarsV237 ? oldV22WeeklyBarsV237(v237WeeklyAdjustedTotal(total)) : {reward:0,punishment:0};
 }
@@ -4983,7 +4983,7 @@ function v237RouletteInflation(){
 }
 
 /* Apply dealer punishment effects */
-const oldV23DealerV237 = typeof v23Dealer === "function" ? v23Dealer : null;
+var oldV23DealerV237 = typeof v23Dealer === "function" ? v23Dealer : null;
 function v23Dealer(){
   const d = oldV23DealerV237 ? oldV23DealerV237() : {targetPPH:20,durationPref:{target:18},temperament:{threshold:78, angerMult:1, push:1},anger:0};
   if(v237Effect("dealerGrudge")){
@@ -5011,7 +5011,7 @@ if(typeof PUNISHMENTS !== "undefined" && Array.isArray(PUNISHMENTS)){
 }
 
 /* Ensure punishment wheel uses replaced pool */
-const oldV18RollOnePunishmentAnimatedV237 = typeof v18RollOnePunishmentAnimated === "function" ? v18RollOnePunishmentAnimated : null;
+var oldV18RollOnePunishmentAnimatedV237 = typeof v18RollOnePunishmentAnimated === "function" ? v18RollOnePunishmentAnimated : null;
 async function v18RollOnePunishmentAnimated(){
   if(typeof PUNISHMENTS !== "undefined" && Array.isArray(PUNISHMENTS)){
     for(let i=0;i<PUNISHMENTS.length;i++) PUNISHMENTS[i] = v237ReplacePunishment(PUNISHMENTS[i]);
@@ -5020,9 +5020,9 @@ async function v18RollOnePunishmentAnimated(){
 }
 
 /* Dashboard controls: show reroll costs and active reward effects */
-const oldRenderV22DashboardV237 = typeof renderV22Dashboard === "function" ? renderV22Dashboard : null;
+var oldRenderV22DashboardV237 = typeof renderV22Dashboard === "function" ? renderV22Dashboard : null;
 function renderV22Dashboard(){
-  if(oldRenderV22DashboardV237) oldRenderV22DashboardV237();
+  if(typeof oldRenderV22DashboardV237 !== "undefined" && oldRenderV22DashboardV237) oldRenderV22DashboardV237();
 
   const resultsEl = document.getElementById("results");
   if(resultsEl && data.todayResults && data.rouletteRewards?.rolls?.length){
@@ -5040,9 +5040,9 @@ function renderV22Dashboard(){
 }
 
 /* Render reward effects text with new names if old renderer exists */
-const oldRenderRewardV237 = typeof renderReward === "function" ? renderReward : null;
+var oldRenderRewardV237 = typeof renderReward === "function" ? renderReward : null;
 function renderReward(){
-  if(oldRenderRewardV237) oldRenderRewardV237();
+  if(typeof oldRenderRewardV237 !== "undefined" && oldRenderRewardV237) oldRenderRewardV237();
   const info = document.getElementById("rewardPathInfo");
   if(info && data.rewardEffects?.length){
     const effects = data.rewardEffects.map(e=>{
@@ -5063,3 +5063,8 @@ if(typeof PUNISHMENTS !== "undefined" && Array.isArray(PUNISHMENTS)){
 }
 save?.();
 render?.();
+
+
+/* V23.8 init-order safety */
+if(typeof oldRenderRewardV237 === "undefined") var oldRenderRewardV237 = null;
+if(typeof oldRenderV22DashboardV237 === "undefined") var oldRenderV22DashboardV237 = null;
