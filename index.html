@@ -6,7 +6,7 @@
   <title>Sissy Random</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=22" />
+  <link rel="stylesheet" href="styles.css?v=23" />
 </head>
 <body>
   <div id="runtimeErrorBox" class="runtime-error hidden"></div>
@@ -49,7 +49,7 @@
       </section>
 
       <section class="roll-box">
-        <button id="rollAllBtn" class="roll">Roll All</button>
+        <button id="rollAllBtn" class="roll">Daily Roll</button>
         <div id="rollStatus" class="status"></div>
       </section>
 
@@ -122,7 +122,7 @@
 
     <nav class="tabs">
       <button class="tab active" data-tab="contract">Contract</button>
-      <button class="tab" data-tab="chastity">Chastity</button>
+      <button class="tab" data-tab="chastity">Chastity Market</button>
       <button class="tab" data-tab="content">Content</button>
       <button class="tab" data-tab="roulette">Roulette</button>
       <button class="tab" data-tab="tasks">Tasks</button>
@@ -164,23 +164,13 @@
 
       <section id="chastity" class="panel hidden">
         <div class="screen-head">
-          <div>
-            <span class="tiny">Current chance</span>
-            <h2>Chastity</h2>
-          </div>
-          <div class="prob"><span id="chastityProb">60</span>%</div>
+          <div><span class="tiny">Market</span><h2>Chastity Market</h2></div>
+          <div class="pill" id="marketStatusPill">Market</div>
         </div>
-
-        <details class="manage">
-          <summary>Manage Cage Pool</summary>
-          <div class="form-grid">
-            <input id="cageName" placeholder="Cage name" />
-            <input id="cageWeight" type="number" min="1" step="1" placeholder="Weight" />
-            <button id="addCage">Add</button>
-          </div>
-          <div id="cageList" class="list"></div>
-        </details>
+        <div id="chastityMarketRoot" class="market-root"></div>
       </section>
+
+
 
       <section id="content" class="panel hidden">
         <div class="screen-head"><div><span class="tiny">Weighted roll</span><h2>Content</h2></div></div>
@@ -314,6 +304,6 @@
     </div>
   </section>
 
-  <script src="app.js?v=22"></script>
+  <script src="app.js?v=23"></script>
 </body>
 </html>

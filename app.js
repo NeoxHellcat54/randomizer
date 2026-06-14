@@ -188,7 +188,7 @@ document.getElementById("addOutfitTag").onclick = () => {
 /* Roll All */
 document.getElementById("rollAllBtn").onclick = () => {
   const t = today();
-  if(data.lastRollDate === t) return alert("Today's Roll All has already been used.");
+  if(data.lastRollDate === t) return alert("Today's Daily Roll has already been used.");
 
   const results = {};
   const chastityYes = chance(data.chastityProbability);
@@ -680,7 +680,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=22").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=23").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -997,7 +997,7 @@ function processSkippedDays(){
 function rollAllSystems(){
   if(data.theEndUnlocked) return;
   const t = localDateString();
-  if(data.lastRollDate === t) return alert("Today's Roll All has already been used.");
+  if(data.lastRollDate === t) return alert("Today's Daily Roll has already been used.");
 
   adjudicatePreviousRolledDayIfNeeded();
 
@@ -1367,7 +1367,7 @@ function rollRouletteV15(force=false){
 }
 function rollAllV15(){
  if(data.theEndUnlocked) return; const t=typeof localDateString==="function"?localDateString():today();
- if(data.lastRollDate===t) return alert("Today's Roll All has already been used.");
+ if(data.lastRollDate===t) return alert("Today's Daily Roll has already been used.");
  if(typeof adjudicatePreviousRolledDayIfNeeded==="function") adjudicatePreviousRolledDayIfNeeded();
  const rsbd=typeof isRSBD==="function"?isRSBD(t):false; const results={date:t,rsbd};
  const chastityChance=rewardEffect("chastityZero")?0:data.chastityProbability; const chastityYes=rsbd?true:chance(chastityChance);
@@ -3046,7 +3046,7 @@ function v194RunCoreRoll(){
   const t = typeof localDateString === "function" ? localDateString() : today();
   if(data.theEndUnlocked) return false;
   if(data.lastRollDate === t){
-    alert("Today's Roll All has already been used.");
+    alert("Today's Daily Roll has already been used.");
     return false;
   }
 
@@ -3809,7 +3809,7 @@ function v194RunCoreRoll(){
   ensureV22Data();v22UpdateVacationState();v22FinalizeMissingDays();
   const t=localDateString();
   if(data.theEndUnlocked)return false;
-  if(data.lastRollDate===t){alert("Today's Roll All has already been used.");return false;}
+  if(data.lastRollDate===t){alert("Today's Daily Roll has already been used.");return false;}
   adjudicatePreviousRolledDayIfNeeded();
   const rsbd=isRSBD(t), results={date:t,rsbd};
   const chastityChance=rewardEffect("chastityZero")?0:data.chastityProbability;
@@ -3827,7 +3827,7 @@ function v194RunCoreRoll(){
   save();render();v22ShowPendingReviews();return true;
 }
 function v22RollMoreTasks(){
-  if(!data.todayResults||data.lastRollDate!==localDateString())return alert("Roll All first.");
+  if(!data.todayResults||data.lastRollDate!==localDateString())return alert("Daily Roll first.");
   if(!v22AllCurrentTasksComplete())return alert("Complete the current task set before rolling more tasks.");
   const tasks=v22NewTaskSet(rollTasks());data.todayResults.tasks=tasks;data.currentTaskSetRewarded=false;data.rollMoreCountToday=Number(data.rollMoreCountToday||0)+1;
   if(data.contract?.signed&&!data.contract?.fulfilled)data.contractStats.totalTasksGenerated+=tasks.length;
@@ -3838,7 +3838,7 @@ function v22RouletteRewardAmount(entry){return Math.round(10000/Math.max(1,Numbe
 function v22ResetRouletteIfNewDay(){if(!data.rouletteRewards||data.rouletteRewards.date!==localDateString())data.rouletteRewards={date:localDateString(),rolls:[],active:null};}
 function v22RollRouletteReward(existingId=null){
   v22ResetRouletteIfNewDay();
-  if(!data.todayResults||data.lastRollDate!==localDateString())return alert("Roll All first.");
+  if(!data.todayResults||data.lastRollDate!==localDateString())return alert("Daily Roll first.");
   if(!v22AllCurrentTasksComplete())return alert("Complete current tasks before rolling roulette.");
   if(data.rouletteRewards.rolls.length>=3&&!existingId)return alert("All 3 roulette rolls have been used today.");
   if(!data.roulette.entries.length)return alert("No roulette entries configured.");
@@ -3893,3 +3893,463 @@ function renderV22Dashboard(){
 if(typeof renderCertificate==="function"){const oldCert=renderCertificate;renderCertificate=function(){let html=oldCert();return html.replace('<span>Highest Streak</span><b>',`<span>Vacation Days Used</span><b>${Number(data.vacation?.daysUsed||0).toLocaleString()}</b><span>All-Time Orgasms</span><b>${Number(data.orgasm?.lifetimeReal||0).toLocaleString()}</b><span>Skipped Days</span><b>${Number(data.orgasm?.skippedDays||0).toLocaleString()}</b><span>Highest Streak</span><b>`);};}
 const oldRenderV22=render;render=function(){oldRenderV22();renderV22Dashboard();};
 ensureV22Data();v22RemoveGameUpgrade();v22UpdateVacationState();v22FinalizeMissingDays();save();render();
+
+
+/* =========================
+   V23 Chastity Market
+   - Replaces old chastity probability flow
+   - One active lock contract at a time
+   - New dealer/market only when countdown completes
+   - RSBD market = hours only, no points
+========================= */
+
+function ensureV23Data(){
+  data.chastityMarket ??= {
+    date:null,
+    rsbd:false,
+    offers:[],
+    dealer:null,
+    negotiation:null,
+    activeContract:null,
+    completedContracts:0
+  };
+  data.chastityMarket.completedContracts ??= 0;
+}
+
+function v23RandInt(min,max){
+  return Math.floor(Math.random()*(max-min+1))+min;
+}
+function v23Clamp(n,min,max){
+  return Math.max(min, Math.min(max, Number(n)||0));
+}
+function v23PPH(hours, points){
+  return Number(points||0)/Math.max(1, Number(hours||1));
+}
+function v23MarketTodayKey(){
+  return localDateString() + (typeof isRSBD==="function" && isRSBD(localDateString()) ? ":rsbd" : ":normal");
+}
+function v23Dealer(){
+  const durationPrefs = [
+    {name:"short", target:8, weight:.8},
+    {name:"medium", target:18, weight:1},
+    {name:"long", target:32, weight:1.15},
+    {name:"veryLong", target:48, weight:1.25}
+  ];
+  const temperaments = [
+    {name:"patient", angerMult:.75, push:.75, threshold:72},
+    {name:"normal", angerMult:1, push:1, threshold:78},
+    {name:"irritable", angerMult:1.25, push:1.2, threshold:84},
+    {name:"explosive", angerMult:1.55, push:1.45, threshold:90}
+  ];
+  return {
+    seed: uid(),
+    targetPPH: v23RandInt(16,28),
+    durationPref: durationPrefs[v23RandInt(0,durationPrefs.length-1)],
+    temperament: temperaments[v23RandInt(0,temperaments.length-1)],
+    anger:0
+  };
+}
+function v23GenerateOffers(rsbd=false){
+  const offers = [];
+  for(let i=0;i<4;i++){
+    const h = v23RandInt(1,24);
+    const p = rsbd ? 0 : v23RandInt(2,400);
+    offers.push({id:uid(), hours:h, points:p});
+  }
+  return offers;
+}
+function v23EnsureMarket(force=false){
+  ensureV23Data();
+  const today = localDateString();
+  const rsbd = typeof isRSBD==="function" && isRSBD(today);
+  const key = today + ":" + (rsbd ? "rsbd" : "normal");
+
+  const active = data.chastityMarket.activeContract;
+  if(active && active.status === "active") return;
+
+  if(force || data.chastityMarket.date !== key || !data.chastityMarket.offers?.length){
+    data.chastityMarket.date = key;
+    data.chastityMarket.rsbd = rsbd;
+    data.chastityMarket.dealer = v23Dealer();
+    data.chastityMarket.offers = v23GenerateOffers(rsbd);
+    data.chastityMarket.negotiation = null;
+  }
+}
+function v23DurationScore(hours, dealer){
+  const target = dealer.durationPref?.target || 18;
+  const diff = Math.abs(Number(hours)-target);
+  return Math.max(0, 100 - diff*2.4);
+}
+function v23PPHScore(hours, points, dealer, rsbd=false){
+  if(rsbd) return 80;
+  const target = dealer.targetPPH || 20;
+  const diff = Math.abs(v23PPH(hours,points)-target);
+  return Math.max(0, 100 - diff*4.2);
+}
+function v23DealerSatisfaction(offer){
+  const dealer = data.chastityMarket.dealer || v23Dealer();
+  const rsbd = !!data.chastityMarket.rsbd;
+  const pphScore = v23PPHScore(offer.hours, offer.points, dealer, rsbd);
+  const durationScore = v23DurationScore(offer.hours, dealer);
+  const angerPenalty = Math.min(35, Number(dealer.anger||0)*.35);
+  return Math.round((pphScore*.58 + durationScore*.42) - angerPenalty);
+}
+function v23DealerThreshold(){
+  const dealer = data.chastityMarket.dealer || v23Dealer();
+  return dealer.temperament?.threshold || 78;
+}
+function v23DealerAccepts(offer){
+  return v23DealerSatisfaction(offer) >= v23DealerThreshold();
+}
+function v23AngerGain(playerOffer, dealerOffer){
+  const dealer = data.chastityMarket.dealer;
+  const rsbd = !!data.chastityMarket.rsbd;
+  const oldScore = v23DealerSatisfaction(dealerOffer);
+  const newScore = v23DealerSatisfaction(playerOffer);
+  let gain = Math.max(0, oldScore - newScore) * .28;
+  // Extra annoyance for aggressively lower hours or higher PPH/points.
+  if(playerOffer.hours < dealerOffer.hours) gain += (dealerOffer.hours-playerOffer.hours)*.9;
+  if(!rsbd && playerOffer.points > dealerOffer.points) gain += (playerOffer.points-dealerOffer.points)/35;
+  gain *= dealer.temperament?.angerMult || 1;
+  return Math.round(gain);
+}
+function v23CounterFrom(offer){
+  const dealer = data.chastityMarket.dealer;
+  const rsbd = !!data.chastityMarket.rsbd;
+  const sat = v23DealerSatisfaction(offer);
+  const push = (dealer.temperament?.push || 1) * (1 + Math.min(1.2, (dealer.anger||0)/100));
+  let h = Number(offer.hours)||1;
+  let p = Number(offer.points)||0;
+
+  const targetH = dealer.durationPref?.target || 18;
+  const hStep = Math.max(1, Math.round(v23Clamp(Math.abs(targetH-h)/5,1,5)*push));
+  if(h < targetH) h += hStep;
+  else if(h > targetH && sat < v23DealerThreshold()) h -= Math.max(1, Math.round(hStep*.45));
+
+  if(!rsbd){
+    const targetP = Math.max(2, Math.round(h * (dealer.targetPPH||20)));
+    const pStep = Math.max(10, Math.round(Math.abs(targetP-p)*.25*push/10)*10);
+    if(p > targetP) p -= pStep;
+    else if(p < targetP && sat < v23DealerThreshold()-8) p += Math.max(10, Math.round(pStep*.35/10)*10);
+    p = Math.max(1, Math.round(p/10)*10);
+  } else {
+    p = 0;
+    // RSBD is more time-focused; push upward a bit if under target.
+    if(h < targetH) h += Math.max(0, Math.round(push));
+  }
+
+  // No giant jumps. Dealer can creep above 24 over negotiation but not leap to 70.
+  const previousH = Number(offer.hours)||1;
+  h = v23Clamp(h, 1, previousH + Math.max(3, Math.round(5*push)));
+  p = Math.max(rsbd?0:1, p);
+
+  return {hours:Math.round(h), points:rsbd?0:Math.round(p)};
+}
+function v23SelectOffer(id){
+  v23EnsureMarket();
+  if(data.chastityMarket.activeContract?.status === "active") return alert("Only one active lock contract is allowed.");
+  const chosen = data.chastityMarket.offers.find(o=>o.id===id);
+  if(!chosen) return;
+  const firstCounter = v23CounterFrom(chosen);
+  data.chastityMarket.negotiation = {
+    original:{...chosen},
+    dealerOffer:firstCounter,
+    userOffer:{...firstCounter},
+    rounds:1,
+    history:[
+      {who:"Market", offer:{...chosen}},
+      {who:"Dealer", offer:{...firstCounter}}
+    ],
+    accepted:false
+  };
+  save(); render();
+}
+window.v23SelectOffer = v23SelectOffer;
+
+function v23AdjustOffer(field, delta){
+  const n = data.chastityMarket.negotiation;
+  if(!n) return;
+  if(field==="hours") n.userOffer.hours = Math.max(1, Number(n.userOffer.hours||1)+delta);
+  if(field==="points" && !data.chastityMarket.rsbd) n.userOffer.points = Math.max(1, Number(n.userOffer.points||0)+delta);
+  save(); render();
+}
+window.v23AdjustOffer = v23AdjustOffer;
+
+function v23ResetUserOffer(){
+  const n = data.chastityMarket.negotiation;
+  if(!n) return;
+  n.userOffer = {...n.dealerOffer};
+  save(); render();
+}
+window.v23ResetUserOffer = v23ResetUserOffer;
+
+function v23SendOffer(){
+  const market = data.chastityMarket;
+  const n = market.negotiation;
+  if(!n) return;
+  const offer = {...n.userOffer};
+  market.dealer.anger = Math.min(100, Number(market.dealer.anger||0) + v23AngerGain(offer, n.dealerOffer));
+  n.history.push({who:"You", offer:{...offer}});
+  n.rounds += 1;
+
+  if(v23DealerAccepts(offer)){
+    n.accepted = true;
+    n.acceptedOffer = offer;
+    n.history.push({who:"Dealer", text:"Accepted"});
+    v23PrepareContract(offer);
+  } else if(market.dealer.anger >= 100){
+    n.history.push({who:"Dealer", text:"The dealer refuses to continue today."});
+    n.closed = true;
+  } else {
+    const counter = v23CounterFrom(offer);
+    n.dealerOffer = counter;
+    n.userOffer = {...counter};
+    n.history.push({who:"Dealer", offer:{...counter}});
+  }
+  save(); render();
+}
+window.v23SendOffer = v23SendOffer;
+
+function v23AcceptDealerOffer(){
+  const n = data.chastityMarket.negotiation;
+  if(!n) return;
+  n.accepted = true;
+  n.acceptedOffer = {...n.dealerOffer};
+  n.history.push({who:"You", text:"Accepted dealer offer"});
+  v23PrepareContract(n.acceptedOffer);
+  save(); render();
+}
+window.v23AcceptDealerOffer = v23AcceptDealerOffer;
+
+function v23RefuseRSBD(){
+  if(!data.chastityMarket.rsbd) return;
+  addPunishmentBar(10);
+  data.chastityMarket.negotiation = null;
+  data.chastityMarket.offers = [];
+  data.chastityMarket.date = localDateString()+":rsbd:refused";
+  save(); render();
+  alert("RSBD market refused. +10 punishment bar.");
+}
+window.v23RefuseRSBD = v23RefuseRSBD;
+
+function v23PrepareContract(offer){
+  const code = String(v23RandInt(0,9999)).padStart(4,"0");
+  data.chastityMarket.activeContract = {
+    id:uid(),
+    status:"pendingStart",
+    hours:Number(offer.hours)||1,
+    points:data.chastityMarket.rsbd?0:(Number(offer.points)||0),
+    rsbd:!!data.chastityMarket.rsbd,
+    code,
+    codeHidden:false,
+    createdAt:Date.now(),
+    startTime:null,
+    endTime:null
+  };
+}
+function v23StartLock(){
+  const c = data.chastityMarket.activeContract;
+  if(!c || c.status!=="pendingStart") return;
+  if(!confirm("Start lock countdown and hide the code?")) return;
+  c.status = "active";
+  c.startTime = Date.now();
+  c.endTime = Date.now() + (Number(c.hours)||1)*3600000;
+  c.codeHidden = true;
+  save(); render();
+}
+window.v23StartLock = v23StartLock;
+
+function v23CheckLockComplete(){
+  const c = data.chastityMarket?.activeContract;
+  if(!c || c.status!=="active") return;
+  if(Date.now() >= Number(c.endTime||0)){
+    c.status = "complete";
+    c.codeHidden = false;
+    if(!c.rsbd && Number(c.points)>0){
+      data.points += Number(c.points)||0;
+      data.lifetimePoints += Math.max(0, Number(c.points)||0);
+      if(data.contract?.signed && !data.contract?.fulfilled){
+        data.contractStats.totalPointsEarned += Math.max(0, Number(c.points)||0);
+      }
+    }
+    data.chastityMarket.completedContracts = Number(data.chastityMarket.completedContracts||0)+1;
+    // Market/dealer refresh after countdown ends.
+    const rsbd = typeof isRSBD==="function" && isRSBD(localDateString());
+    data.chastityMarket.date = null;
+    data.chastityMarket.offers = [];
+    data.chastityMarket.dealer = null;
+    data.chastityMarket.negotiation = null;
+    save();
+    alert("Lock complete. Code revealed.");
+  }
+}
+function v23ClearCompletedLock(){
+  const c = data.chastityMarket.activeContract;
+  if(!c || c.status!=="complete") return;
+  data.chastityMarket.activeContract = null;
+  v23EnsureMarket(true);
+  save(); render();
+}
+window.v23ClearCompletedLock = v23ClearCompletedLock;
+
+function v23TimeRemainingText(ms){
+  ms = Math.max(0, Number(ms)||0);
+  const totalMin = Math.floor(ms/60000);
+  const h = Math.floor(totalMin/60);
+  const m = totalMin%60;
+  return `${h}h ${m}m`;
+}
+function v23OfferText(o, rsbd=false){
+  if(!o) return "";
+  return rsbd ? `${o.hours}h` : `${o.hours}h / ${o.points} pts`;
+}
+function renderChastityMarket(){
+  ensureV23Data();
+  v23CheckLockComplete();
+  v23EnsureMarket();
+
+  const root = document.getElementById("chastityMarketRoot");
+  const pill = document.getElementById("marketStatusPill");
+  if(!root) return;
+
+  const market = data.chastityMarket;
+  const rsbd = !!market.rsbd;
+  const c = market.activeContract;
+  if(pill) pill.textContent = c?.status==="active" ? "Lock Active" : rsbd ? "RSBD Market" : "Market";
+
+  if(c){
+    if(c.status==="pendingStart"){
+      root.innerHTML = `
+        <div class="market-card lock-contract-card">
+          <h3>Lock Contract Accepted</h3>
+          <div class="market-big">${c.hours} Hours${c.rsbd ? "" : ` · ${Number(c.points).toLocaleString()} Points`}</div>
+          <div class="unlock-code-box"><span>Unlock Code</span><b>${c.code}</b></div>
+          <p class="muted">Confirm when ready. Once started, the code is hidden until the countdown ends.</p>
+          <button onclick="v23StartLock()" class="claim">Start Lock</button>
+        </div>`;
+      return;
+    }
+    if(c.status==="active"){
+      root.innerHTML = `
+        <div class="market-card lock-contract-card active-lock">
+          <h3>Lock Active</h3>
+          <div class="market-big">${v23TimeRemainingText(Number(c.endTime)-Date.now())}</div>
+          <div class="unlock-code-box hidden-code"><span>Unlock Code</span><b>••••</b></div>
+          <p class="muted">The code will reveal automatically when the countdown ends.</p>
+        </div>`;
+      return;
+    }
+    if(c.status==="complete"){
+      root.innerHTML = `
+        <div class="market-card lock-contract-card complete-lock">
+          <h3>Lock Complete</h3>
+          <div class="unlock-code-box"><span>Unlock Code</span><b>${c.code}</b></div>
+          ${!c.rsbd ? `<p class="muted">Reward paid: ${Number(c.points||0).toLocaleString()} points.</p>` : `<p class="muted">RSBD contract complete.</p>`}
+          <button onclick="v23ClearCompletedLock()" class="claim">Refresh Market</button>
+        </div>`;
+      return;
+    }
+  }
+
+  const n = market.negotiation;
+  if(n){
+    const canPoints = !rsbd;
+    root.innerHTML = `
+      <div class="market-card negotiation-card ${rsbd ? "rsbd-market" : ""}">
+        <h3>${rsbd ? "RSBD Time Market" : "Negotiation"}</h3>
+        ${rsbd ? `<p class="muted">RSBD market is hours only. Refusing the market adds +10 punishment bar.</p>` : ""}
+        <div class="dealer-offer">
+          <span>Dealer Offer</span>
+          <b>${v23OfferText(n.dealerOffer, rsbd)}</b>
+        </div>
+        <div class="your-offer">
+          <span>Your Offer</span>
+          <b>${v23OfferText(n.userOffer, rsbd)}</b>
+        </div>
+        <div class="market-controls">
+          <button onclick="v23AdjustOffer('hours',-1)">-1h</button>
+          <button onclick="v23AdjustOffer('hours',1)">+1h</button>
+          ${canPoints ? `<button onclick="v23AdjustOffer('points',-10)">-10pts</button><button onclick="v23AdjustOffer('points',10)">+10pts</button>` : ""}
+        </div>
+        <div class="row">
+          <button onclick="v23ResetUserOffer()">Reset</button>
+          <button onclick="v23SendOffer()" ${n.closed ? "disabled" : ""}>Send Offer</button>
+          <button onclick="v23AcceptDealerOffer()" class="claim" ${n.closed ? "disabled" : ""}>Accept Dealer Offer</button>
+        </div>
+        ${rsbd ? `<button onclick="v23RefuseRSBD()" class="delete">Refuse RSBD Market</button>` : ""}
+        <div class="negotiation-history">
+          ${n.history.map(h=>`<div><b>${esc(h.who)}:</b> ${h.offer ? esc(v23OfferText(h.offer, rsbd)) : esc(h.text||"")}</div>`).join("")}
+        </div>
+      </div>`;
+    return;
+  }
+
+  root.innerHTML = `
+    <div class="market-card ${rsbd ? "rsbd-market" : ""}">
+      <h3>${rsbd ? "RSBD Time Market" : "Today's Market"}</h3>
+      <p class="muted">${rsbd ? "Choose an hours-only offer. The dealer will counter before any deal can be accepted." : "Choose one of the four offers. The dealer will always counter first."}</p>
+      <div class="market-offers">
+        ${market.offers.map(o=>`
+          <button class="market-offer" onclick="v23SelectOffer('${o.id}')">
+            <b>${v23OfferText(o, rsbd)}</b>
+            ${!rsbd ? `<span>${v23PPH(o.hours,o.points).toFixed(1)} pts/hour</span>` : `<span>Time only</span>`}
+          </button>
+        `).join("")}
+      </div>
+      ${rsbd ? `<button onclick="v23RefuseRSBD()" class="delete">Refuse RSBD Market (+10 Bar)</button>` : ""}
+    </div>`;
+}
+
+function getRollAnimationStages(r){
+  if(!r) return [];
+  const stages = [];
+  stages.push({icon:"✦", label:"Content", value:r.content || "No content configured", duration:1450});
+  const tasks = r.tasks || [];
+  if(tasks.length){
+    tasks.forEach((task, idx)=>stages.push({icon:"✓", label:`Task ${idx+1} / ${tasks.length}`, value:`${task.name} · ${task.tag}`, duration:4000}));
+  } else stages.push({icon:"✓", label:"Tasks", value:"No tasks rolled", duration:1800});
+  const outfits = r.outfits || [];
+  if(outfits.length){
+    outfits.forEach((outfit, idx)=>stages.push({icon:"👗", label:`Outfit ${idx+1} / ${outfits.length}`, value:`${outfit.tag} · ${outfit.name}`, duration:4000}));
+  } else stages.push({icon:"👗", label:"Outfit", value:"No outfit items today", duration:1800});
+  stages.push({icon:"♡", label:"Summary", value:"Daily Roll Complete", duration:1400});
+  return stages;
+}
+
+function renderResults(){
+  const resultsEl = document.getElementById("results");
+  if(!resultsEl) return;
+  if(!data.todayResults){resultsEl.classList.add("hidden");resultsEl.innerHTML="";return;}
+  const r=data.todayResults,tasks=r.tasks||[],outfits=r.outfits||[];
+  resultsEl.classList.remove("hidden");
+  const taskHtml = tasks.length ? tasks.map(t=>`
+    <label class="home-task-check ${t.complete?"done":""}">
+      <input type="checkbox" ${t.complete?"checked":""} onchange="toggleTodayTask('${t.id}', this.checked)">
+      <span><b>${esc(t.name)}</b><small>${esc(t.tag)}${t.failsafe?" · failsafe":""}${t.overflow?" · overflow":""}${t.rsbd?" · RSBD":""}</small></span>
+    </label>`).join("") : `<div class="muted">No tasks rolled.</div>`;
+  resultsEl.innerHTML = `
+    <div class="today-card-main ${r.rsbd?"rsbd-today-card":""}">
+      ${r.rsbd?`<div class="rsbd-inline-badge">✨ RANDOM SISSY BIMBO DAY ✨</div>`:""}
+      <div class="today-card-head"><div><span class="tiny">${r.rsbd?"Special Event":"Today"}</span><h2>${r.rsbd?"Today's Special Tasks":"Today's Tasks"}</h2></div><span class="pill">${tasks.filter(t=>t.complete).length}/${tasks.length} done</span></div>
+      <div class="home-task-list">${taskHtml}</div>
+    </div>
+    <details class="daily-summary-card" open>
+      <summary>Daily Roll Summary</summary>
+      <div class="summary-grid">
+        <div class="summary-item"><b>Content</b><span>${esc(r.content||"No content configured")}</span></div>
+        <div class="summary-item"><b>Outfit</b><span>${typeof renderOutfitCards==="function"?renderOutfitCards(outfits):outfits.map(o=>`${esc(o.tag)} — ${esc(o.name)}`).join("<br>")}</span></div>
+      </div>
+    </details>`;
+}
+
+const oldRenderV23 = render;
+render = function(){
+  oldRenderV23();
+  renderChastityMarket();
+};
+
+ensureV23Data();
+v23EnsureMarket();
+setInterval(()=>{try{v23CheckLockComplete();renderChastityMarket();}catch(e){}}, 30000);
+save();
+render();
