@@ -138,8 +138,8 @@ document.getElementById("claimRewardBtn").onclick = () => {
 };
 
 /* Simple list adders */
-document.getElementById("addCage").onclick = () => addWeighted("cages","cageName","cageWeight");
-document.getElementById("addContent").onclick = () => addWeighted("content","contentName","contentWeight");
+safeOn("addCage", () => addWeighted("cages","cageName","cageWeight"));
+safeOn("addContent", () => addWeighted("content","contentName","contentWeight"));
 { const el = document.getElementById("addGame"); if(el) el.onclick = () => addWeighted("games","gameName","gameWeight"); }
 function addWeighted(collection, nameId, weightId){
   const nameEl = document.getElementById(nameId), weightEl = document.getElementById(weightId);
@@ -680,7 +680,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=23").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=23.1").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -4353,3 +4353,33 @@ v23EnsureMarket();
 setInterval(()=>{try{v23CheckLockComplete();renderChastityMarket();}catch(e){}}, 30000);
 save();
 render();
+
+
+/* V23.1 null-safe binding helper */
+function safeOn(id, handler){
+  const el = document.getElementById(id);
+  if(el) el.onclick = handler;
+}
+
+
+/* V23.1 safe roulette renderer override */
+function renderRoulette(){
+  const base = document.getElementById("rouletteBase") || window.rouletteBase;
+  const tax = document.getElementById("rouletteTax") || window.rouletteTax;
+  const eff = document.getElementById("rouletteEffective") || window.rouletteEffective;
+  const list = document.getElementById("rouletteList") || window.rouletteList;
+  if(base) base.textContent = "Optional";
+  if(tax) tax.textContent = "3/day";
+  if(eff) eff.textContent = "10000 / Weight";
+  if(!list) return;
+  const entries = data.roulette?.entries || [];
+  list.innerHTML = entries.map(item => `
+    <div class="item">
+      <div><b>${esc(item.name)}</b><div class="muted">${esc(item.url)}</div><div class="muted">Weight: ${esc(item.weight)} · Reward: ${typeof v22RouletteRewardAmount==="function" ? v22RouletteRewardAmount(item).toLocaleString() : Math.round(10000/Math.max(1,Number(item.weight)||1)).toLocaleString()} points</div></div>
+      <div class="item-actions">
+        <input type="number" min="1" value="${esc(item.weight)}" onchange="updateRoulette('${item.id}','weight',this.value)">
+        <button class="delete" onclick="deleteRoulette('${item.id}')">Delete</button>
+      </div>
+    </div>
+  `).join("") || `<div class="muted">No roulette entries yet.</div>`;
+}
