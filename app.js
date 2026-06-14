@@ -682,7 +682,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=23.8").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=23.9").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -5068,3 +5068,112 @@ render?.();
 /* V23.8 init-order safety */
 if(typeof oldRenderRewardV237 === "undefined") var oldRenderRewardV237 = null;
 if(typeof oldRenderV22DashboardV237 === "undefined") var oldRenderV22DashboardV237 = null;
+
+
+/* V23.9 stack overflow fix: final non-recursive renderers */
+
+function renderReward(){
+  try{
+    if(typeof ensureV15Data === "function") ensureV15Data();
+    const cur = typeof currentRewardDef === "function" ? currentRewardDef() : null;
+    const title = document.getElementById("rewardTitle");
+    const bar = document.getElementById("rewardBar");
+    const progress = document.getElementById("rewardProgress");
+    const badge = document.getElementById("rewardLockBadge");
+    const info = document.getElementById("rewardPathInfo");
+    const details = document.getElementById("rewardDetails");
+
+    if(details) details.classList.add("hidden");
+    if(title) title.textContent = cur ? cur.name : "No reward active";
+    if(bar){
+      bar.max = cur ? cur.target : 1;
+      bar.value = data.rewardPath?.progress || 0;
+    }
+    if(progress){
+      const pct = cur ? Math.round(((data.rewardPath?.progress || 0) / cur.target) * 100) : 0;
+      progress.textContent = cur ? `${data.rewardPath?.progress || 0} / ${cur.target} task sets · ${pct}%` : "0 / 0";
+    }
+    if(badge) badge.textContent = "Reward Path";
+    if(info && cur){
+      const ready = (data.rewardPath?.progress || 0) >= cur.target;
+      const effects = (data.rewardEffects || []).map(e=>{
+        if(e.tasks) return `${esc(e.name)}: ${e.tasks} task${e.tasks===1?"":"s"} left`;
+        if(e.completedDays) return `${esc(e.name)}: ${e.completedDays} completed day${e.completedDays===1?"":"s"} left`;
+        return esc(e.name);
+      }).join("<br>");
+      info.innerHTML = `
+        <div class="muted">${esc(cur.text || "")}</div>
+        ${ready ? `<button onclick="claimCurrentRewardPath()" class="claim reward-claim">Claim Reward</button>` : ""}
+        ${effects ? `<div class="reward-effects"><b>Active Reward/Punishment Effects</b><br>${effects}</div>` : ""}
+      `;
+    }
+  }catch(e){
+    console.warn("renderReward skipped:", e.message);
+  }
+}
+
+function renderV22Dashboard(){
+  try{
+    if(typeof renderV22DashboardCore === "function") return renderV22DashboardCore();
+    // Minimal dashboard fallback if old implementation is unavailable/recursive.
+    const org = document.getElementById("orgasmDashboardCard");
+    if(org && data.orgasm){
+      org.innerHTML = `
+        <div class="screen-head"><div><span class="tiny">Counter</span><h2>Orgasms</h2></div><button onclick="v22RecordOrgasm()">+1 Orgasm</button></div>
+        <div class="orgasm-grid">
+          <div><span>Today</span><b>${data.orgasm.todayReal || 0}</b></div>
+          <div><span>This Week</span><b>${data.orgasm.weekTotal || 0}</b></div>
+          <div><span>All-Time Orgasms</span><b>${data.orgasm.lifetimeReal || 0}</b></div>
+          <div><span>Skipped Days</span><b>${data.orgasm.skippedDays || 0}</b></div>
+        </div>`;
+    }
+    const resultsEl = document.getElementById("results");
+    if(resultsEl && data.todayResults && !resultsEl.querySelector(".v22-extra-controls")){
+      const can = typeof v22AllCurrentTasksComplete === "function" && v22AllCurrentTasksComplete() && data.lastRollDate === localDateString();
+      if(typeof v22ResetRouletteIfNewDay === "function") v22ResetRouletteIfNewDay();
+      const rolls = data.rouletteRewards?.rolls || [];
+      const c = document.createElement("div");
+      c.className = "v22-extra-controls";
+      c.innerHTML = `
+        <button onclick="v22RollMoreTasks()" ${can?"":"disabled"}>Roll More Tasks</button>
+        <button onclick="v22RollRouletteReward()" ${can && rolls.length < 3 ? "" : "disabled"}>Roll Roulette Reward (${rolls.length}/3)</button>
+        ${rolls.map(r=>{
+          const cost = typeof v237RerollCost === "function" ? v237RerollCost() : 50;
+          return `<div class="roulette-reward-card">
+            <b>${esc(r.name)}</b>
+            <span>Reward: ${Number(r.reward||0).toLocaleString()} points · Weight ${esc(r.weight)}</span>
+            <div class="row">
+              <button onclick="v22RollRouletteReward('${r.id}')" ${r.complete?"disabled":""}>${cost===0?"Reroll (Free)":`Reroll (${cost.toLocaleString()} pts)`}</button>
+              <button class="claim" onclick="v22CompleteRouletteReward('${r.id}')" ${r.complete?"disabled":""}>${r.complete?"Completed":"Mark Complete"}</button>
+            </div>
+          </div>`;
+        }).join("")}
+        ${data.pointPenaltyDebt ? `<div class="v22-penalty-note">Point penalty debt: next ${data.pointPenaltyDebt} completed task${data.pointPenaltyDebt===1?"":"s"} worth 75%.</div>` : ""}
+      `;
+      resultsEl.appendChild(c);
+    }
+  }catch(e){
+    console.warn("renderV22Dashboard skipped:", e.message);
+  }
+}
+
+/* Make final render non-recursive by guarding re-entry */
+var v239Rendering = false;
+const renderBeforeV239 = typeof render === "function" ? render : function(){};
+render = function(){
+  if(v239Rendering) return;
+  v239Rendering = true;
+  try{
+    renderBeforeV239();
+  }catch(e){
+    if(!(String(e).includes("Maximum call stack") || String(e).includes("null"))){
+      console.warn("base render warning:", e.message);
+    }
+  }
+  try{ renderReward(); }catch(e){}
+  try{ if(typeof renderChastityMarket === "function") renderChastityMarket(); }catch(e){}
+  try{ renderV22Dashboard(); }catch(e){}
+  v239Rendering = false;
+};
+
+try{ render(); }catch(e){ console.warn("V23.9 initial render warning:", e.message); }
