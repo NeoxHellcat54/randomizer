@@ -1188,3 +1188,5 @@ input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(255,120,186,.12)}
 }
 
 .reward-effects{margin-top:10px;padding:10px;border-radius:16px;background:rgba(255,232,243,.68);color:var(--muted);font-weight:800}.reward-effects b{color:var(--pink2)}
+
+.legacy-compat{display:none!important;visibility:hidden!important;pointer-events:none!important;width:0!important;height:0!important;overflow:hidden!important}

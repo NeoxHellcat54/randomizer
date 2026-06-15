@@ -1,3 +1,12 @@
+
+/* V23.13 universal null-safe onclick binding */
+function bindIfExistsV2313(target, handler){
+  try{
+    const el = typeof target === "string" ? document.getElementById(target) : target;
+    if(el) el.onclick = handler;
+  }catch(e){}
+}
+
 function v234EnsureLegacyDOM(){const ids=['cageList', 'chastityBar', 'chastityCageList', 'chastityProb', 'gamesList', 'punishmentBarText', 'punishmentBarValue', 'punishmentList', 'punishmentsList', 'spinWheel', 'upgradesList', 'vacationDaysInput', 'wheelOverlay', 'wheelResult', 'wheelTitle'];let root=document.getElementById('legacyCompat');if(!root){root=document.createElement('div');root.id='legacyCompat';root.className='legacy-compat';document.body.appendChild(root);}ids.forEach(id=>{if(!document.getElementById(id)){const el=document.createElement('div');el.id=id;root.appendChild(el);}})}
 try{if(document.body)v234EnsureLegacyDOM();else document.addEventListener('DOMContentLoaded',v234EnsureLegacyDOM);}catch(e){}
 
@@ -622,7 +631,7 @@ function bindDevTools(){
   const panel = document.getElementById("devPanel");
   const toggle = document.getElementById("devToggle");
   if(!panel || !toggle) return;
-  toggle.onclick = () => panel.classList.toggle("hidden");
+  bindIfExistsV2313(toggle, () => panel.classList.toggle("hidden"));
 
   document.getElementById("devUnlockRoll").onclick = () => {
     data.lastRollDate = null;
@@ -682,7 +691,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=23.12").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=23.13").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
