@@ -682,7 +682,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=23.9").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=23.10").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -5177,3 +5177,59 @@ render = function(){
 };
 
 try{ render(); }catch(e){ console.warn("V23.9 initial render warning:", e.message); }
+
+
+/* V23.10 flat render: never call previous render wrapper */
+function v2310SafeCall(fnName){
+  try{
+    const fn = globalThis[fnName];
+    if(typeof fn === "function" && fnName !== "render") return fn();
+  }catch(e){
+    console.warn(`Skipped ${fnName}:`, e.message);
+  }
+}
+
+function render(){
+  if(window.__v2310Rendering) return;
+  window.__v2310Rendering = true;
+
+  ["ensureSystemsData","ensureV15Data","ensureV20Data","ensureV22Data","ensureV23Data","ensureV237Data"].forEach(fn=>{
+    try{ if(typeof globalThis[fn] === "function") globalThis[fn](); }catch(e){}
+  });
+
+  try{
+    const pts = document.getElementById("points");
+    if(pts) pts.textContent = Number(data.points || 0).toLocaleString();
+    const streak = document.getElementById("streak");
+    if(streak) streak.textContent = Number(data.currentStreak || 0).toLocaleString();
+  }catch(e){}
+
+  [
+    "renderReward",
+    "renderResults",
+    "renderV22Dashboard",
+    "renderChastityMarket",
+    "renderRoulette",
+    "renderContract",
+    "renderPunishments",
+    "renderUpgrades",
+    "renderCages",
+    "renderContent",
+    "renderTasks",
+    "renderOutfits",
+    "renderSettings"
+  ].forEach(v2310SafeCall);
+
+  window.__v2310Rendering = false;
+}
+
+function scheduleRender(){
+  if(window.__v2310RenderScheduled) return;
+  window.__v2310RenderScheduled = true;
+  setTimeout(()=>{
+    window.__v2310RenderScheduled = false;
+    render();
+  }, 0);
+}
+
+try{ render(); }catch(e){ console.warn("V23.10 render warning:", e.message); }
