@@ -682,7 +682,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=23.11").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=23.12").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -4774,3 +4774,106 @@ function render(){
 }
 
 ensureV2311Data(); v2311CleanLegacyRewards(); v2311PatchPunishments(); save?.(); render?.();
+
+/* V23.12 null-safe click binding */
+function safeBindClickV2312(id, handler){
+  const el = document.getElementById(id);
+  if(el) el.onclick = handler;
+}
+
+
+/* V23.12 removed reward migration fix */
+function v2312MigrateRemovedRewards(){
+  const removed = [
+    "chastityDecrease",
+    "taxRelief",
+    "chastityAmnesty",
+    "rouletteProtection",
+    "chastityZero",
+    "chastityReduction",
+    "rouletteProtectionOld"
+  ];
+
+  data.rewardEffects = (data.rewardEffects || []).filter(e => !removed.includes(e.id));
+
+  if(data.rewardPath && removed.includes(data.rewardPath.current)){
+    data.rewardPath.current = null;
+    data.rewardPath.progress = 0;
+    if(typeof rollNextRewardPath === "function"){
+      rollNextRewardPath();
+    } else if(typeof REWARD_PRESETS !== "undefined" && REWARD_PRESETS.length){
+      data.rewardPath.current = REWARD_PRESETS[0].id;
+    }
+  }
+
+  // If current reward does not exist anymore, reroll safely.
+  if(data.rewardPath?.current && typeof REWARD_PRESETS !== "undefined"){
+    const exists = REWARD_PRESETS.some(r => r.id === data.rewardPath.current);
+    if(!exists){
+      data.rewardPath.current = null;
+      data.rewardPath.progress = 0;
+      if(typeof rollNextRewardPath === "function") rollNextRewardPath();
+      else data.rewardPath.current = REWARD_PRESETS[0]?.id || null;
+    }
+  }
+}
+
+const v2312OldCurrentRewardDef = typeof currentRewardDef === "function" ? currentRewardDef : null;
+function currentRewardDef(){
+  v2312MigrateRemovedRewards();
+  if(typeof REWARD_PRESETS === "undefined" || !REWARD_PRESETS.length) return null;
+  if(!data.rewardPath) data.rewardPath = {current:null,progress:0,recent:[],sinceHeels:[],claimedHistory:[]};
+  if(!data.rewardPath.current || !REWARD_PRESETS.some(r=>r.id===data.rewardPath.current)){
+    if(typeof rollNextRewardPath === "function") rollNextRewardPath();
+    else data.rewardPath.current = REWARD_PRESETS[0].id;
+  }
+  return REWARD_PRESETS.find(r=>r.id===data.rewardPath.current) || REWARD_PRESETS[0];
+}
+
+// Replace reward renderer with a self-contained safe version so old missing buttons cannot crash.
+function renderReward(){
+  try{
+    v2312MigrateRemovedRewards();
+    const cur = currentRewardDef();
+    const title = document.getElementById("rewardTitle");
+    const bar = document.getElementById("rewardBar");
+    const progress = document.getElementById("rewardProgress");
+    const badge = document.getElementById("rewardLockBadge");
+    const info = document.getElementById("rewardPathInfo");
+    const details = document.getElementById("rewardDetails");
+
+    if(details) details.classList.add("hidden");
+    if(title) title.textContent = cur ? cur.name : "No reward active";
+    if(bar){
+      bar.max = cur ? cur.target : 1;
+      bar.value = data.rewardPath?.progress || 0;
+    }
+    if(progress){
+      const pct = cur ? Math.round(((data.rewardPath?.progress || 0) / cur.target) * 100) : 0;
+      progress.textContent = cur ? `${data.rewardPath?.progress || 0} / ${cur.target} task sets · ${pct}%` : "0 / 0";
+    }
+    if(badge) badge.textContent = "Reward Path";
+    if(info){
+      if(!cur){
+        info.innerHTML = `<div class="muted">No reward path available.</div>`;
+      } else {
+        const ready = (data.rewardPath?.progress || 0) >= cur.target;
+        const effects = (data.rewardEffects || []).map(e=>{
+          if(e.tasks) return `${esc(e.name)}: ${e.tasks} task${e.tasks===1?"":"s"} left`;
+          if(e.completedDays) return `${esc(e.name)}: ${e.completedDays} completed day${e.completedDays===1?"":"s"} left`;
+          return esc(e.name || e.id);
+        }).join("<br>");
+        info.innerHTML = `
+          <div class="muted">${esc(cur.text || "")}</div>
+          ${ready ? `<button onclick="claimCurrentRewardPath()" class="claim reward-claim">Claim Reward</button>` : ""}
+          ${effects ? `<div class="reward-effects"><b>Active Reward/Punishment Effects</b><br>${effects}</div>` : ""}
+        `;
+      }
+    }
+  }catch(e){
+    console.warn("renderReward skipped:", e.message);
+  }
+}
+
+v2312MigrateRemovedRewards();
+save?.();
