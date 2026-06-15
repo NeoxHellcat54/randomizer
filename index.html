@@ -6,7 +6,7 @@
   <title>Sissy Random</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=23.13" />
+  <link rel="stylesheet" href="styles.css?v=23.14" />
 </head>
 <body>
   <div id="runtimeErrorBox" class="runtime-error hidden"></div>
@@ -304,7 +304,43 @@
     </div>
   </section>
 
-  <script src="app.js?v=23.13"></script>
+  
+  <div id="legacyPreScriptCompat" class="legacy-compat" aria-hidden="true">
+      <button id="devPointsMinus" type="button" tabindex="-1" aria-hidden="true"></button>
+      <button id="devPointsPlus" type="button" tabindex="-1" aria-hidden="true"></button>
+      <button id="devPunishmentMinus" type="button" tabindex="-1" aria-hidden="true"></button>
+      <button id="devPunishmentPlus" type="button" tabindex="-1" aria-hidden="true"></button>
+  </div>
+
+
+  <script>
+    window.__legacyAutoCreateIds = true;
+    (function(){
+      const originalGet = Document.prototype.getElementById;
+      Document.prototype.getElementById = function(id){
+        let el = originalGet.call(this, id);
+        if(!el && window.__legacyAutoCreateIds){
+          let root = originalGet.call(this, "legacyPreScriptCompat");
+          if(!root && this.body){
+            root = this.createElement("div");
+            root.id = "legacyPreScriptCompat";
+            root.className = "legacy-compat";
+            root.setAttribute("aria-hidden","true");
+            this.body.appendChild(root);
+          }
+          if(root){
+            el = this.createElement("button");
+            el.id = id;
+            el.type = "button";
+            root.appendChild(el);
+          }
+        }
+        return el;
+      };
+    })();
+  </script>
+
+<script src="app.js?v=23.14"></script>
 
   <div id="legacyCompat" class="legacy-compat" aria-hidden="true">
     <div id="cageList"></div>

@@ -691,7 +691,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=23.13").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=23.14").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -4886,3 +4886,4 @@ function renderReward(){
 
 v2312MigrateRemovedRewards();
 save?.();
+/* V23.14: legacy auto-created DOM compatibility remains enabled intentionally. */
