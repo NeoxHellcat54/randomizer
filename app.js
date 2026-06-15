@@ -1,12 +1,3 @@
-
-/* V23.13 universal null-safe onclick binding */
-function bindIfExistsV2313(target, handler){
-  try{
-    const el = typeof target === "string" ? document.getElementById(target) : target;
-    if(el) el.onclick = handler;
-  }catch(e){}
-}
-
 function v234EnsureLegacyDOM(){const ids=['cageList', 'chastityBar', 'chastityCageList', 'chastityProb', 'gamesList', 'punishmentBarText', 'punishmentBarValue', 'punishmentList', 'punishmentsList', 'spinWheel', 'upgradesList', 'vacationDaysInput', 'wheelOverlay', 'wheelResult', 'wheelTitle'];let root=document.getElementById('legacyCompat');if(!root){root=document.createElement('div');root.id='legacyCompat';root.className='legacy-compat';document.body.appendChild(root);}ids.forEach(id=>{if(!document.getElementById(id)){const el=document.createElement('div');el.id=id;root.appendChild(el);}})}
 try{if(document.body)v234EnsureLegacyDOM();else document.addEventListener('DOMContentLoaded',v234EnsureLegacyDOM);}catch(e){}
 
@@ -119,7 +110,7 @@ document.querySelectorAll(".tab").forEach(btn=>{
 });
 
 /* Reward controls */
-document.getElementById("presetRewardBtn").onclick = () => {
+(document.getElementById("presetRewardBtn")||{}).onclick = () => {
   if(data.reward.locked) return alert("Reward is locked until claimed.");
   data.reward.name = "Dealer's Vacation";
   data.reward.target = 15;
@@ -127,7 +118,7 @@ document.getElementById("presetRewardBtn").onclick = () => {
   data.reward.preset = "chastityDecrease";
   save(); render();
 };
-document.getElementById("lockRewardBtn").onclick = () => {
+(document.getElementById("lockRewardBtn")||{}).onclick = () => {
   if(data.reward.locked) return;
   const name = document.getElementById("rewardNameInput").value.trim() || data.reward.name;
   const target = Number(document.getElementById("rewardTargetInput").value || data.reward.target);
@@ -139,7 +130,7 @@ document.getElementById("lockRewardBtn").onclick = () => {
   if(data.reward.name !== "Dealer's Vacation") data.reward.preset = null;
   save(); render();
 };
-document.getElementById("claimRewardBtn").onclick = () => {
+(document.getElementById("claimRewardBtn")||{}).onclick = () => {
   if(data.reward.progress < data.reward.target) return;
   if(data.reward.preset === "chastityDecrease"){
     data.chastityProbability = Math.max(0, data.chastityProbability - 20);
@@ -163,11 +154,11 @@ function addWeighted(collection, nameId, weightId){
 }
 
 /* Roulette */
-document.getElementById("cumProductivityBtn").onclick = () => {
+(document.getElementById("cumProductivityBtn")||{}).onclick = () => {
   data.roulette.cumProductivity += 1;
   save(); render();
 };
-document.getElementById("addRoulette").onclick = () => {
+(document.getElementById("addRoulette")||{}).onclick = () => {
   const name = rouletteName.value.trim();
   const url = rouletteUrl.value.trim();
   const weight = Math.max(1, Number(rouletteWeight.value)||1);
@@ -178,7 +169,7 @@ document.getElementById("addRoulette").onclick = () => {
 };
 
 /* Tasks */
-document.getElementById("addTaskTag").onclick = () => {
+(document.getElementById("addTaskTag")||{}).onclick = () => {
   const name = taskTagName.value.trim();
   if(!name) return alert("Enter a tag name.");
   data.taskTags.push({id:uid(), name, tasks:[]});
@@ -187,7 +178,7 @@ document.getElementById("addTaskTag").onclick = () => {
 };
 
 /* Outfits */
-document.getElementById("addOutfitTag").onclick = () => {
+(document.getElementById("addOutfitTag")||{}).onclick = () => {
   const name = outfitTagName.value.trim();
   const probability = clamp(outfitTagProb.value,0,100);
   if(!name) return alert("Enter a tag name.");
@@ -197,7 +188,7 @@ document.getElementById("addOutfitTag").onclick = () => {
 };
 
 /* Roll All */
-document.getElementById("rollAllBtn").onclick = () => {
+(document.getElementById("rollAllBtn")||{}).onclick = () => {
   const t = today();
   if(data.lastRollDate === t) return alert("Today's Daily Roll has already been used.");
 
@@ -631,58 +622,58 @@ function bindDevTools(){
   const panel = document.getElementById("devPanel");
   const toggle = document.getElementById("devToggle");
   if(!panel || !toggle) return;
-  bindIfExistsV2313(toggle, () => panel.classList.toggle("hidden"));
+  toggle.onclick = () => panel.classList.toggle("hidden");
 
-  document.getElementById("devUnlockRoll").onclick = () => {
+  (document.getElementById("devUnlockRoll")||{}).onclick = () => {
     data.lastRollDate = null;
     save(); render();
     alert("Today's roll has been unlocked.");
   };
-  document.getElementById("devClearResults").onclick = () => {
+  (document.getElementById("devClearResults")||{}).onclick = () => {
     data.todayResults = null;
     data.rewardGrantedDate = null;
     save(); render();
   };
-  document.getElementById("devResetAll").onclick = () => {
+  (document.getElementById("devResetAll")||{}).onclick = () => {
     if(confirm("Reset all local data?")){
       localStorage.removeItem(KEY);
       data = load();
       save(); render();
     }
   };
-  document.getElementById("devRewardPlus").onclick = () => {
+  (document.getElementById("devRewardPlus")||{}).onclick = () => {
     data.reward.progress = Math.min(data.reward.target || 999, (data.reward.progress || 0) + 1);
     save(); render();
   };
-  document.getElementById("devRewardMinus").onclick = () => {
+  (document.getElementById("devRewardMinus")||{}).onclick = () => {
     data.reward.progress = Math.max(0, (data.reward.progress || 0) - 1);
     save(); render();
   };
-  document.getElementById("devChastityPlus").onclick = () => {
+  (document.getElementById("devChastityPlus")||{}).onclick = () => {
     data.chastityProbability = Math.min(100, Number(data.chastityProbability || 0) + 5);
     save(); render();
   };
-  document.getElementById("devChastityMinus").onclick = () => {
+  (document.getElementById("devChastityMinus")||{}).onclick = () => {
     data.chastityProbability = Math.max(0, Number(data.chastityProbability || 0) - 5);
     save(); render();
   };
-  document.getElementById("devProductivityPlus").onclick = () => {
+  (document.getElementById("devProductivityPlus")||{}).onclick = () => {
     data.roulette.cumProductivity = Number(data.roulette.cumProductivity || 0) + 5;
     save(); render();
   };
-  document.getElementById("devProductivityReset").onclick = () => {
+  (document.getElementById("devProductivityReset")||{}).onclick = () => {
     data.roulette.cumProductivity = 0;
     save(); render();
   };
-  document.getElementById("devRouletteBasePlus").onclick = () => {
+  (document.getElementById("devRouletteBasePlus")||{}).onclick = () => {
     data.roulette.base = Math.round((Number(data.roulette.base || 0) + 0.5) * 10) / 10;
     save(); render();
   };
-  document.getElementById("devRouletteBaseMinus").onclick = () => {
+  (document.getElementById("devRouletteBaseMinus")||{}).onclick = () => {
     data.roulette.base = Math.max(0, Math.round((Number(data.roulette.base || 0) - 0.5) * 10) / 10);
     save(); render();
   };
-  document.getElementById("devForceReroll").onclick = () => {
+  (document.getElementById("devForceReroll")||{}).onclick = () => {
     forceRollAll();
   };
 }
@@ -691,7 +682,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=23.14").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=23.15").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -713,7 +704,7 @@ if ("serviceWorker" in navigator) {
 
 const devDressSkirtBtn = document.getElementById("devForceDressSkirtTest");
 if(devDressSkirtBtn){
-  devDressSkirtBtn.onclick = () => {
+  if(devDressSkirtBtn) devDressSkirtBtn.onclick = () => {
     alert("Outfit rule test: create tags Dress, Skirt, Top. Set Dress incompatible with Skirt. Set Skirt required tags to Top. Then use Force Reroll All or high probabilities to test Dress vs Skirt+Top.");
   };
 }
@@ -4886,4 +4877,30 @@ function renderReward(){
 
 v2312MigrateRemovedRewards();
 save?.();
-/* V23.14: legacy auto-created DOM compatibility remains enabled intentionally. */
+
+
+/* V23.15: safe reward migration + no hidden DOM hijack */
+function v2315EnsureCurrentRewardVisible(){
+  try{
+    if(typeof v2312MigrateRemovedRewards === "function") v2312MigrateRemovedRewards();
+    if(data.rewardPath && (!data.rewardPath.current || (typeof REWARD_PRESETS !== "undefined" && !REWARD_PRESETS.some(r=>r.id===data.rewardPath.current)))){
+      data.rewardPath.current = null;
+      data.rewardPath.progress = 0;
+      if(typeof rollNextRewardPath === "function") rollNextRewardPath();
+      else if(typeof REWARD_PRESETS !== "undefined" && REWARD_PRESETS.length) data.rewardPath.current = REWARD_PRESETS[0].id;
+    }
+  }catch(e){ console.warn("Reward migration warning:", e.message); }
+}
+
+const v2315OldRender = typeof render === "function" ? render : null;
+function render(){
+  if(window.__v2315Rendering) return;
+  window.__v2315Rendering = true;
+  try{ v2315EnsureCurrentRewardVisible(); }catch(e){}
+  try{ if(v2315OldRender) v2315OldRender(); }catch(e){ console.warn("render warning:", e.message); }
+  window.__v2315Rendering = false;
+}
+
+v2315EnsureCurrentRewardVisible();
+save?.();
+render?.();
