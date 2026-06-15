@@ -682,7 +682,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=23.15").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=23.16").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -4764,17 +4764,7 @@ function v2311AdjustedWeeklyTotal(total){if(!getRewardEffect("weeklyDisciplinePe
 function v22WeeklyPoints(total){return v2311OldWeeklyPoints?v2311OldWeeklyPoints(v2311AdjustedWeeklyTotal(total)):Math.round(1000-(Math.ceil(v2311AdjustedWeeklyTotal(total)/5)*333.33));}
 function v22WeeklyBars(total){const r=v2311OldWeeklyBars?v2311OldWeeklyBars(v2311AdjustedWeeklyTotal(total)):{reward:0,punishment:0}; if(getRewardEffect("weeklyDisciplinePenalty"))consumeRewardEffect("weeklyDisciplinePenalty"); return r;}
 
-var v2311OldRender=typeof render==="function"?render:null;
-function render(){
-  if(window.__v2311Rendering)return;
-  window.__v2311Rendering=true;
-  try{if(v2311OldRender)v2311OldRender();}catch(e){console.warn("render warning",e.message);}
-  try{document.querySelectorAll(".roulette-reward-card").forEach(card=>{const b=[...card.querySelectorAll("button")].find(x=>x.textContent.includes("Reroll")); if(b&&!b.disabled){const c=v2311RerollCost(); b.textContent=c===0?"Reroll (Free)":`Reroll (${c.toLocaleString()} pts)`;}});}catch(e){}
-  window.__v2311Rendering=false;
-}
-
-ensureV2311Data(); v2311CleanLegacyRewards(); v2311PatchPunishments(); save?.(); render?.();
-
+ensureV2311Data(); v2311CleanLegacyRewards(); v2311PatchPunishments(); save?.();
 /* V23.12 null-safe click binding */
 function safeBindClickV2312(id, handler){
   const el = document.getElementById(id);
@@ -4879,28 +4869,24 @@ v2312MigrateRemovedRewards();
 save?.();
 
 
-/* V23.15: safe reward migration + no hidden DOM hijack */
-function v2315EnsureCurrentRewardVisible(){
+
+
+/* V23.16 startup migration without render hijack */
+function v2316StartupMigration(){
   try{
     if(typeof v2312MigrateRemovedRewards === "function") v2312MigrateRemovedRewards();
-    if(data.rewardPath && (!data.rewardPath.current || (typeof REWARD_PRESETS !== "undefined" && !REWARD_PRESETS.some(r=>r.id===data.rewardPath.current)))){
-      data.rewardPath.current = null;
-      data.rewardPath.progress = 0;
-      if(typeof rollNextRewardPath === "function") rollNextRewardPath();
-      else if(typeof REWARD_PRESETS !== "undefined" && REWARD_PRESETS.length) data.rewardPath.current = REWARD_PRESETS[0].id;
+    if(typeof v2311CleanLegacyRewards === "function") v2311CleanLegacyRewards();
+    if(data.rewardPath && typeof REWARD_PRESETS !== "undefined"){
+      if(!data.rewardPath.current || !REWARD_PRESETS.some(r=>r.id===data.rewardPath.current)){
+        data.rewardPath.current = null;
+        data.rewardPath.progress = 0;
+        if(typeof rollNextRewardPath === "function") rollNextRewardPath();
+        else if(REWARD_PRESETS[0]) data.rewardPath.current = REWARD_PRESETS[0].id;
+      }
     }
-  }catch(e){ console.warn("Reward migration warning:", e.message); }
+    if(typeof v2311PatchPunishments === "function") v2311PatchPunishments();
+    save?.();
+  }catch(e){ console.warn("V23.16 migration warning:", e.message); }
 }
-
-const v2315OldRender = typeof render === "function" ? render : null;
-function render(){
-  if(window.__v2315Rendering) return;
-  window.__v2315Rendering = true;
-  try{ v2315EnsureCurrentRewardVisible(); }catch(e){}
-  try{ if(v2315OldRender) v2315OldRender(); }catch(e){ console.warn("render warning:", e.message); }
-  window.__v2315Rendering = false;
-}
-
-v2315EnsureCurrentRewardVisible();
-save?.();
-render?.();
+v2316StartupMigration();
+try{ render?.(); }catch(e){ console.warn("V23.16 render warning:", e.message); }
