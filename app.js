@@ -22,7 +22,7 @@ const defaults = {
   games: [],
   roulette: {
     base: 1,
-    cumTax: 0,
+    cumProductivity: 0,
     entries: []
   },
   taskTags: [],
@@ -112,7 +112,7 @@ document.querySelectorAll(".tab").forEach(btn=>{
 /* Reward controls */
 document.getElementById("presetRewardBtn").onclick = () => {
   if(data.reward.locked) return alert("Reward is locked until claimed.");
-  data.reward.name = "Chastity Decrease";
+  data.reward.name = "Dealer's Vacation";
   data.reward.target = 15;
   data.reward.progress = 0;
   data.reward.preset = "chastityDecrease";
@@ -127,7 +127,7 @@ document.getElementById("lockRewardBtn").onclick = () => {
   data.reward.target = Math.floor(target);
   data.reward.progress = 0;
   data.reward.locked = true;
-  if(data.reward.name !== "Chastity Decrease") data.reward.preset = null;
+  if(data.reward.name !== "Dealer's Vacation") data.reward.preset = null;
   save(); render();
 };
 document.getElementById("claimRewardBtn").onclick = () => {
@@ -154,8 +154,8 @@ function addWeighted(collection, nameId, weightId){
 }
 
 /* Roulette */
-document.getElementById("cumTaxBtn").onclick = () => {
-  data.roulette.cumTax += 1;
+document.getElementById("cumProductivityBtn").onclick = () => {
+  data.roulette.cumProductivity += 1;
   save(); render();
 };
 document.getElementById("addRoulette").onclick = () => {
@@ -221,10 +221,10 @@ document.getElementById("rollAllBtn").onclick = () => {
 };
 
 function rollRoulette(){
-  const effective = data.roulette.base + data.roulette.cumTax;
+  const effective = data.roulette.base + data.roulette.cumProductivity;
   if(chance(effective)){
     const picked = weightedRoll(data.roulette.entries);
-    data.roulette.cumTax = 0;
+    data.roulette.cumProductivity = 0;
     data.roulette.base = Math.round((data.roulette.base + 0.5) * 10) / 10;
     return {triggered:true, name:picked ? picked.name : "No roulette entry configured", url:picked ? picked.url : ""};
   }
@@ -427,8 +427,8 @@ function renderWeightedList(id, arr, key){
 }
 function renderRoulette(){
   rouletteBase.textContent = data.roulette.base;
-  rouletteTax.textContent = data.roulette.cumTax;
-  rouletteEffective.textContent = data.roulette.base + data.roulette.cumTax;
+  rouletteProductivity.textContent = data.roulette.cumProductivity;
+  rouletteEffective.textContent = data.roulette.base + data.roulette.cumProductivity;
   rouletteList.innerHTML = data.roulette.entries.map(item => `
     <div class="item">
       <div><b>${esc(item.name)}</b><div class="muted">${esc(item.url)}</div><div class="muted">Weight: ${esc(item.weight)}</div></div>
@@ -657,12 +657,12 @@ function bindDevTools(){
     data.chastityProbability = Math.max(0, Number(data.chastityProbability || 0) - 5);
     save(); render();
   };
-  document.getElementById("devTaxPlus").onclick = () => {
-    data.roulette.cumTax = Number(data.roulette.cumTax || 0) + 5;
+  document.getElementById("devProductivityPlus").onclick = () => {
+    data.roulette.cumProductivity = Number(data.roulette.cumProductivity || 0) + 5;
     save(); render();
   };
-  document.getElementById("devTaxReset").onclick = () => {
-    data.roulette.cumTax = 0;
+  document.getElementById("devProductivityReset").onclick = () => {
+    data.roulette.cumProductivity = 0;
     save(); render();
   };
   document.getElementById("devRouletteBasePlus").onclick = () => {
@@ -682,7 +682,7 @@ bindDevTools();
 
 /* V5 PWA update handling */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js?v=23.10").then(reg => {
+  navigator.serviceWorker.register("./service-worker.js?v=23.11").then(reg => {
     reg.addEventListener("updatefound", () => {
       const worker = reg.installing;
       if (!worker) return;
@@ -715,7 +715,7 @@ if(devDressSkirtBtn){
 ========================= */
 
 const UPGRADE_DEFS = [
-  {id:"taxCut", name:"Tax Cut", max:99, desc:"Cum Tax increase amount -0.01% per level."},
+  {id:"taxCut", name:"Productivity Cut", max:99, desc:"Cum Productivity increase amount -0.01% per level."},
   {id:"chastityControl", name:"Chastity Control", max:99, desc:"Chastity NO increase amount -0.01% per level."},
   {id:"contentDouble", name:"Content Double Roll", max:100, desc:"1% chance per level to roll Content twice."},
   {id:"gameDouble", name:"Game Double Roll", max:100, desc:"1% chance per level to roll Game twice."},
@@ -728,16 +728,16 @@ const RARITY_WEIGHTS = {Common:50, Uncommon:30, Rare:12, Epic:6, Legendary:2};
 const PUNISHMENTS = [
   {id:"pointDrain", rarity:"Common", name:"Point Drain", desc:"Lose 10% current points.", apply:()=>{data.points -= Math.ceil(Math.abs(data.points) * 0.10);}},
   {id:"rewardLoss", rarity:"Common", name:"Reward Loss", desc:"Lose 2 reward progress.", apply:()=>{data.reward.progress = Math.max(0,(data.reward.progress||0)-2);}},
-  {id:"pointTax", rarity:"Common", name:"Point Tax", desc:"-25% points earned for 30 days.", apply:()=>addTempPunishment("pointTax", "Point Tax", 30, {pointGainMult:0.75})},
+  {id:"pointProductivity", rarity:"Common", name:"Point Productivity", desc:"-25% points earned for 30 days.", apply:()=>addTempPunishment("pointProductivity", "Point Productivity", 30, {pointGainMult:0.75})},
   {id:"taskSurge", rarity:"Common", name:"Task Surge", desc:"+2 minimum tasks for 10 days.", apply:()=>addTempPunishment("taskSurge", "Task Surge", 10, {minTasksAdd:2})},
 
   {id:"rewardFreeze", rarity:"Uncommon", name:"Reward Freeze", desc:"Reward progress cannot increase for 10 days.", apply:()=>addTempPunishment("rewardFreeze", "Reward Freeze", 10, {rewardFrozen:true})},
   {id:"upgradeLock", rarity:"Uncommon", name:"Upgrade Lock", desc:"Cannot purchase upgrades for 10 days.", apply:()=>addTempPunishment("upgradeLock", "Upgrade Lock", 10, {upgradesLocked:true})},
-  {id:"cumTaxX3", rarity:"Uncommon", name:"Cum Tax Increase x3", desc:"Cum Tax increase amount x3 for 10 days.", apply:()=>addTempPunishment("cumTaxX3", "Cum Tax Increase x3", 10, {cumTaxMult:3})},
+  {id:"cumProductivityX3", rarity:"Uncommon", name:"Cum Productivity Increase x3", desc:"Cum Productivity increase amount x3 for 10 days.", apply:()=>addTempPunishment("cumProductivityX3", "Cum Productivity Increase x3", 10, {cumProductivityMult:3})},
   {id:"chastityX3", rarity:"Uncommon", name:"Chastity Increase x3", desc:"Chastity NO increase amount x3 for 10 days.", apply:()=>addTempPunishment("chastityX3", "Chastity Increase x3", 10, {chastityIncMult:3})},
 
   {id:"disableMods", rarity:"Rare", name:"Disable Modifiers", desc:"All upgrade effects disabled for 10 days.", apply:()=>addTempPunishment("disableMods", "Disable Modifiers", 10, {disableModifiers:true})},
-  {id:"severePointTax", rarity:"Rare", name:"Severe Point Tax", desc:"-75% points earned for 10 days.", apply:()=>addTempPunishment("severePointTax", "Severe Point Tax", 10, {pointGainMult:0.25})},
+  {id:"severePointProductivity", rarity:"Rare", name:"Severe Point Productivity", desc:"-75% points earned for 10 days.", apply:()=>addTempPunishment("severePointProductivity", "Severe Point Productivity", 10, {pointGainMult:0.25})},
   {id:"rewardInflation", rarity:"Rare", name:"Reward Inflation", desc:"Current reward target +5 days.", apply:()=>{if(data.reward?.target) data.reward.target += 5;}},
   {id:"dailyDebt", rarity:"Rare", name:"Daily Debt", desc:"+1 punishment bar every day for 10 days.", apply:()=>addTempPunishment("dailyDebt", "Daily Debt", 10, {dailyPunishmentAdd:1})},
 
@@ -883,7 +883,7 @@ function decrementDailyEffects(){
 
 function taxIncreaseAmount(){
   const base = Math.max(0.01, 1 - (upgradeLevel("taxCut") * 0.01));
-  return base * combinedEffectMult("cumTaxMult", 1);
+  return base * combinedEffectMult("cumProductivityMult", 1);
 }
 function chastityIncreaseAmount(){
   const base = Math.max(0.01, 1 - (upgradeLevel("chastityControl") * 0.01));
@@ -974,10 +974,10 @@ function rollOutfits(forceAll=false){
   return results;
 }
 function rollRoulette(force=false){
-  const effective = data.roulette.base + data.roulette.cumTax;
+  const effective = data.roulette.base + data.roulette.cumProductivity;
   if(force || chance(effective)){
     const picked = weightedRoll(data.roulette.entries);
-    data.roulette.cumTax = 0;
+    data.roulette.cumProductivity = 0;
     data.roulette.base = Math.round((data.roulette.base + 0.5) * 10) / 10;
     return {triggered:true, name:picked ? picked.name : "No roulette entry configured", url:picked ? picked.url : ""};
   }
@@ -1173,8 +1173,8 @@ render = function(){
 function bindSystemsButtons(){
   const rb = document.getElementById("rollAllBtn");
   if(rb) rb.onclick = rollAllSystems;
-  const ct = document.getElementById("cumTaxBtn");
-  if(ct) ct.onclick = () => {data.roulette.cumTax += taxIncreaseAmount(); save(); render();};
+  const ct = document.getElementById("cumProductivityBtn");
+  if(ct) ct.onclick = () => {data.roulette.cumProductivity += taxIncreaseAmount(); save(); render();};
   const rp = document.getElementById("rollPunishmentsBtn");
   if(rp) rp.onclick = rollAvailablePunishments;
 
@@ -1264,12 +1264,12 @@ bindV14DevTools();
 
 /* V15 reward path + streaks */
 var REWARD_PRESETS=[
-{id:"chastityDecrease",name:"Chastity Decrease",target:15,text:"Chastity probability -20% permanently."},
-{id:"taxRelief",name:"Tax Relief",target:15,text:"Cum Tax disabled for the next 5 completed days."},
-{id:"chastityAmnesty",name:"Chastity Amnesty",target:20,text:"Chastity treated as 0% for the next 7 completed days."},
+{id:"chastityDecrease",name:"Dealer's Vacation",target:15,text:"Chastity probability -20% permanently."},
+{id:"taxRelief",name:"Productivity Boost",target:15,text:"Cum Productivity disabled for the next 5 completed days."},
+{id:"chastityAmnesty",name:"Smooth Talker",target:20,text:"Chastity treated as 0% for the next 7 completed days."},
 {id:"upgradeVoucher",name:"Upgrade Voucher",target:25,text:"Gain points equal to the cheapest available upgrade. The End ? is excluded."},
 {id:"rewardMultiplier",name:"Reward Multiplier",target:20,text:"Double points for the next 10 completed tasks."},
-{id:"rouletteProtection",name:"Roulette Protection",target:15,text:"Roulette cannot trigger for the next 5 completed days."},
+{id:"rouletteProtection",name:"Jackpot Protection",target:15,text:"Roulette cannot trigger for the next 5 completed days."},
 {id:"luckyWeek",name:"Lucky Week",target:20,text:"Content Double Roll guaranteed for the next 7 completed days."},
 {id:"shopping",name:"Shopping",target:25,text:"You get to buy a new item of clothing."},
 {id:"highHeelsLover",name:"High Heels Lover",target:40,text:"You get to buy a new pair of heels.",special:true}
@@ -1324,11 +1324,11 @@ function cheapestUpgradeCostOnly(){
 }
 function applyRewardPreset(id){
  if(id==="chastityDecrease") data.chastityProbability=Math.max(0,Number(data.chastityProbability||0)-20);
- if(id==="taxRelief") addRewardEffect("taxRelief","Tax Relief",{completedDays:5,disableCumTax:true});
- if(id==="chastityAmnesty") addRewardEffect("chastityAmnesty","Chastity Amnesty",{completedDays:7,chastityZero:true});
+ if(id==="taxRelief") addRewardEffect("taxRelief","Productivity Boost",{completedDays:5,disableCumProductivity:true});
+ if(id==="chastityAmnesty") addRewardEffect("chastityAmnesty","Smooth Talker",{completedDays:7,chastityZero:true});
  if(id==="upgradeVoucher"){const c=cheapestUpgradeCostOnly(); data.points+=c; data.lifetimePoints+=Math.max(0,c)}
  if(id==="rewardMultiplier") addRewardEffect("rewardMultiplier","Reward Multiplier",{tasks:10,pointMult:2});
- if(id==="rouletteProtection") addRewardEffect("rouletteProtection","Roulette Protection",{completedDays:5,rouletteBlocked:true});
+ if(id==="rouletteProtection") addRewardEffect("rouletteProtection","Jackpot Protection",{completedDays:5,rouletteBlocked:true});
  if(id==="luckyWeek") addRewardEffect("luckyWeek","Lucky Week",{completedDays:7,contentDoubleGuaranteed:true});
  if(id==="shopping") alert("Shopping reward claimed: You get to buy a new item of clothing.");
  if(id==="highHeelsLover") alert("High Heels Lover claimed: You get to buy a new pair of heels.");
@@ -1399,7 +1399,7 @@ if(typeof adjudicatePreviousRolledDayIfNeeded==="function"){const oldAdj=adjudic
 if(typeof processSkippedDays==="function"){const oldPS=processSkippedDays; processSkippedDays=function(){const before=data.lastSeenDate; oldPS(); const t=typeof localDateString==="function"?localDateString():today(); if(before&&before!==t) breakStreak()}}
 function renderV15(){ensureV15Data(); const cs=document.getElementById("currentStreakText"), ls=document.getElementById("longestStreakText"), sm=document.getElementById("streakMilestoneText"); if(cs)cs.textContent=data.currentStreak||0; if(ls)ls.textContent=data.longestStreak||0; if(sm){const next=STREAK_MILESTONES.find(m=>m.days>(data.currentStreak||0)); sm.textContent=next?`Next milestone: ${next.days} days`:"All streak milestones reached."} syncRewardObjectToPath()}
 const oldRenderForV15=render; render=function(){oldRenderForV15(); renderV15()};
-function bindV15(){const rb=document.getElementById("rollAllBtn"); if(rb)rb.onclick=rollAllV15; const tax=document.getElementById("cumTaxBtn"); if(tax)tax.onclick=()=>{if(rewardEffect("disableCumTax"))return alert("Tax Relief is active. Cum Tax did not increase."); data.roulette.cumTax+=typeof taxIncreaseAmount==="function"?taxIncreaseAmount():1; save(); render()}; const dr=document.getElementById("devRewardReroll"); if(dr)dr.onclick=()=>{const cur=data.rewardPath?.current; if(cur){data.rewardPath.recent.unshift(cur); data.rewardPath.recent=data.rewardPath.recent.slice(0,2)} rollNextRewardPath(); save(); render()}; const sp=document.getElementById("devStreakPlus"); if(sp)sp.onclick=()=>{increaseStreakAndAward(); save(); render()}; const sr=document.getElementById("devStreakReset"); if(sr)sr.onclick=()=>{data.currentStreak=0; save(); render()}}
+function bindV15(){const rb=document.getElementById("rollAllBtn"); if(rb)rb.onclick=rollAllV15; const tax=document.getElementById("cumProductivityBtn"); if(tax)tax.onclick=()=>{if(rewardEffect("disableCumProductivity"))return alert("Productivity Boost is active. Cum Productivity did not increase."); data.roulette.cumProductivity+=typeof taxIncreaseAmount==="function"?taxIncreaseAmount():1; save(); render()}; const dr=document.getElementById("devRewardReroll"); if(dr)dr.onclick=()=>{const cur=data.rewardPath?.current; if(cur){data.rewardPath.recent.unshift(cur); data.rewardPath.recent=data.rewardPath.recent.slice(0,2)} rollNextRewardPath(); save(); render()}; const sp=document.getElementById("devStreakPlus"); if(sp)sp.onclick=()=>{increaseStreakAndAward(); save(); render()}; const sr=document.getElementById("devStreakReset"); if(sr)sr.onclick=()=>{data.currentStreak=0; save(); render()}}
 ensureV15Data(); bindV15(); save(); render();
 
 
@@ -3404,7 +3404,7 @@ function keepConfigurationOnlyResetProgress(){
   data._contractCompletedTaskIds = [];
 
   data.chastityProbability = 60;
-  data.roulette = {base:1, cumTax:0, entries:keep.rouletteEntries};
+  data.roulette = {base:1, cumProductivity:0, entries:keep.rouletteEntries};
 
   data.cages = keep.cages;
   data.content = keep.content;
@@ -3862,7 +3862,7 @@ window.toggleTodayTask=(taskId,checked)=>{
   save();render();
 };
 function renderRoulette(){
-  rouletteBase.textContent="Optional"; rouletteTax.textContent="3/day"; rouletteEffective.textContent="10000 / Weight";
+  rouletteBase.textContent="Optional"; rouletteProductivity.textContent="3/day"; rouletteEffective.textContent="10000 / Weight";
   rouletteList.innerHTML=data.roulette.entries.map(item=>`<div class="item"><div><b>${esc(item.name)}</b><div class="muted">${esc(item.url)}</div><div class="muted">Weight: ${esc(item.weight)} · Reward: ${v22RouletteRewardAmount(item).toLocaleString()} points</div></div><div class="item-actions"><input type="number" min="1" value="${esc(item.weight)}" onchange="updateRoulette('${item.id}','weight',this.value)"><button class="delete" onclick="deleteRoulette('${item.id}')">Delete</button></div></div>`).join("")||`<div class="muted">No roulette entries yet.</div>`;
 }
 function v22NextRSBDInfo(){const todayStr=localDateString(),todayDate=parseLocalDate(todayStr);let candidates=[];[todayDate.getFullYear(),todayDate.getFullYear()+1].forEach(y=>candidates.push(...(ensureRSBDYear(y)||[])));candidates=candidates.sort();const next=candidates.find(d=>parseLocalDate(d)>=todayDate);return next?{date:next,days:Math.floor((parseLocalDate(next)-todayDate)/86400000)}:null;}
@@ -4353,7 +4353,7 @@ function safeOn(id, handler){
 /* V23.1 safe roulette renderer override */
 function renderRoulette(){
   const base = document.getElementById("rouletteBase") || window.rouletteBase;
-  const tax = document.getElementById("rouletteTax") || window.rouletteTax;
+  const tax = document.getElementById("rouletteProductivity") || window.rouletteProductivity;
   const eff = document.getElementById("rouletteEffective") || window.rouletteEffective;
   const list = document.getElementById("rouletteList") || window.rouletteList;
   if(base) base.textContent = "Optional";
@@ -4438,7 +4438,7 @@ try { render(); } catch(e) {
 
 /* V23.3 emergency legacy-null renderer rebuild */
 function v233LegacyElFallbacks(){
-  const names = ["rouletteList","rouletteBase","rouletteTax","rouletteEffective","rewardTitle","rewardBar","rewardProgress","rewardLockBadge","rewardPathInfo","rewardDetails"];
+  const names = ["rouletteList","rouletteBase","rouletteProductivity","rouletteEffective","rewardTitle","rewardBar","rewardProgress","rewardLockBadge","rewardPathInfo","rewardDetails"];
   names.forEach(name=>{
     try{
       if(typeof window[name] === "undefined" || window[name] === null){
@@ -4621,615 +4621,156 @@ function v23CheckLockComplete(){
 window.v23CheckLockComplete = v23CheckLockComplete;
 
 
-/* =========================
-   V23.7 reward, punishment, roulette-reroll redesign
-========================= */
-
-function ensureV237Data(){
+/* V23.11 stable reward/punishment/reroll patch */
+function ensureV2311Data(){
   data.rewardEffects ??= [];
-  data.v237 ??= {};
-  data.v237.rouletteRerollCount ??= 0;
-  data.v237.lastRouletteCompleteKey ??= null;
+  data.v2311 ??= {};
+  data.v2311.rouletteRerollCount ??= 0;
 }
-
-function v237Effect(id){
-  return (data.rewardEffects || []).find(e => e.id === id);
-}
-function v237AddEffect(effect){
+function addRewardEffect(effect){
   data.rewardEffects ??= [];
-  const existing = data.rewardEffects.find(e => e.id === effect.id);
-  if(existing) Object.assign(existing, effect);
-  else data.rewardEffects.push(effect);
+  const existing=data.rewardEffects.find(e=>e.id===effect.id);
+  if(existing) Object.assign(existing,effect); else data.rewardEffects.push(effect);
 }
-function v237ConsumeEffect(id){
+function getRewardEffect(id){return (data.rewardEffects||[]).find(e=>e.id===id);}
+function consumeRewardEffect(id){
   data.rewardEffects ??= [];
-  const idx = data.rewardEffects.findIndex(e=>e.id===id);
-  if(idx >= 0){
-    const e = data.rewardEffects[idx];
-    data.rewardEffects.splice(idx,1);
-    return e;
-  }
+  const i=data.rewardEffects.findIndex(e=>e.id===id);
+  if(i>=0){const e=data.rewardEffects[i];data.rewardEffects.splice(i,1);return e;}
   return null;
 }
 
-/* New reward path pool */
-var REWARD_PRESETS = [
-  {
-    id:"dealersVacation",
-    name:"Dealer's Vacation",
-    target:20,
-    text:"Next Chastity Market selection is instantly accepted.",
-    apply(){ v237AddEffect({id:"dealersVacation", name:"Dealer's Vacation"}); }
-  },
-  {
-    id:"productivityBoost",
-    name:"Productivity Boost",
-    target:15,
-    text:"Next 10 completed tasks grant +25% points.",
-    apply(){ v237AddEffect({id:"productivityBoost", name:"Productivity Boost", tasks:10, mult:1.25}); }
-  },
-  {
-    id:"smoothTalker",
-    name:"Smooth Talker",
-    target:20,
-    text:"Dealer anger gain reduced by 50% during the next market negotiation.",
-    apply(){ v237AddEffect({id:"smoothTalker", name:"Smooth Talker"}); }
-  },
-  {
-    id:"jackpotProtection",
-    name:"Jackpot Protection",
-    target:25,
-    text:"Next roulette reroll is free.",
-    apply(){ v237AddEffect({id:"jackpotProtection", name:"Jackpot Protection"}); }
-  },
-  {
-    id:"upgradeVoucher",
-    name:"Upgrade Voucher",
-    target:25,
-    text:"Your next normal upgrade purchase is free. Does not apply to The End?",
-    apply(){ v237AddEffect({id:"upgradeVoucher", name:"Upgrade Voucher"}); }
-  },
-  {
-    id:"rewardMultiplier",
-    name:"Reward Multiplier",
-    target:20,
-    text:"Next 10 completed tasks get a points multiplier.",
-    apply(){ v237AddEffect({id:"taskRewardMult", name:"Reward Multiplier", tasks:10, mult:1.5}); }
-  },
-  {
-    id:"luckyWeek",
-    name:"Lucky Week",
-    target:20,
-    text:"For the next 7 completed days, task points are boosted.",
-    apply(){ v237AddEffect({id:"pointGainMult", name:"Lucky Week", completedDays:7, mult:1.25}); }
-  },
-  {
-    id:"shopping",
-    name:"Shopping",
-    target:25,
-    text:"You get to buy a new item of clothing.",
-    apply(){ v237AddEffect({id:"shopping", name:"Shopping"}); }
-  },
-  {
-    id:"highHeelsLover",
-    name:"High Heels Lover",
-    target:40,
-    text:"A special high heels reward. Can only roll after all others have appeared since the last time it appeared.",
-    special:true,
-    apply(){ v237AddEffect({id:"highHeelsLover", name:"High Heels Lover"}); }
-  }
+var REWARD_PRESETS=[
+{id:"dealersVacation",name:"Dealer's Vacation",target:20,text:"Next Chastity Market selection is instantly accepted.",apply(){addRewardEffect({id:"dealersVacation",name:"Dealer's Vacation"});}},
+{id:"productivityBoost",name:"Productivity Boost",target:15,text:"Next 10 completed tasks grant +25% points.",apply(){addRewardEffect({id:"productivityBoost",name:"Productivity Boost",tasks:10,mult:1.25});}},
+{id:"smoothTalker",name:"Smooth Talker",target:20,text:"Dealer anger gain reduced by 50% during the next market negotiation.",apply(){addRewardEffect({id:"smoothTalker",name:"Smooth Talker"});}},
+{id:"jackpotProtection",name:"Jackpot Protection",target:25,text:"Next roulette reroll is free.",apply(){addRewardEffect({id:"jackpotProtection",name:"Jackpot Protection"});}},
+{id:"upgradeVoucher",name:"Upgrade Voucher",target:25,text:"Your next normal upgrade purchase is free. Does not apply to The End?",apply(){addRewardEffect({id:"upgradeVoucher",name:"Upgrade Voucher"});}},
+{id:"rewardMultiplier",name:"Reward Multiplier",target:20,text:"Next 10 completed tasks get a points multiplier.",apply(){addRewardEffect({id:"taskRewardMult",name:"Reward Multiplier",tasks:10,mult:1.5});}},
+{id:"luckyWeek",name:"Lucky Week",target:20,text:"For the next 7 completed days, task points are boosted.",apply(){addRewardEffect({id:"pointGainMult",name:"Lucky Week",completedDays:7,mult:1.25});}},
+{id:"shopping",name:"Shopping",target:25,text:"You get to buy a new item of clothing.",apply(){addRewardEffect({id:"shopping",name:"Shopping"});}},
+{id:"highHeelsLover",name:"High Heels Lover",target:40,text:"A special high heels reward.",special:true,apply(){addRewardEffect({id:"highHeelsLover",name:"High Heels Lover"});}}
 ];
 
-/* Keep old currentRewardDef-compatible behavior but use new pool */
-function currentRewardDef(){
-  ensureV15Data?.();
-  if(!data.rewardPath.current){
-    rollNextRewardPath();
+function v2311CleanLegacyRewards(){
+  const bad=["taxRelief","chastityAmnesty","chastityDecrease","rouletteProtection","chastityZero"];
+  data.rewardEffects=(data.rewardEffects||[]).filter(e=>!bad.includes(e.id));
+  if(data.rewardPath && bad.includes(data.rewardPath.current)){
+    data.rewardPath.current=null;data.rewardPath.progress=0;
+    if(typeof rollNextRewardPath==="function") rollNextRewardPath();
   }
-  return REWARD_PRESETS.find(r=>r.id===data.rewardPath.current) || REWARD_PRESETS[0];
 }
-
-function rollNextRewardPath(){
-  ensureV15Data?.();
-  data.rewardPath ??= {current:null, progress:0, recent:[], sinceHeels:[], claimedHistory:[]};
-  const recent = data.rewardPath.recent || [];
-  let pool = REWARD_PRESETS.filter(r=>!r.special && !recent.includes(r.id));
-
-  const allNonSpecial = REWARD_PRESETS.filter(r=>!r.special).map(r=>r.id);
-  data.rewardPath.sinceHeels ??= [];
-  const heelsEligible = allNonSpecial.every(id=>data.rewardPath.sinceHeels.includes(id));
-  const heels = REWARD_PRESETS.find(r=>r.id==="highHeelsLover");
-  if(heelsEligible && heels && !recent.includes(heels.id)) pool.push(heels);
-
-  if(!pool.length) pool = REWARD_PRESETS.filter(r=>!r.special);
-  const picked = pool[Math.floor(Math.random()*pool.length)] || REWARD_PRESETS[0];
-
-  data.rewardPath.current = picked.id;
-  data.rewardPath.progress = 0;
-  data.rewardPath.recent = [picked.id, ...(data.rewardPath.recent||[])].slice(0,2);
-  if(picked.id === "highHeelsLover") data.rewardPath.sinceHeels = [];
-  else {
-    data.rewardPath.sinceHeels ??= [];
-    if(!data.rewardPath.sinceHeels.includes(picked.id)) data.rewardPath.sinceHeels.push(picked.id);
-  }
-  save?.();
+function v2311TaskMultiplier(){
+  let m=1;
+  const p=getRewardEffect("productivityBoost"); if(p&&p.tasks>0)m*=Number(p.mult||1.25);
+  const r=getRewardEffect("taskRewardMult"); if(r&&r.tasks>0)m*=Number(r.mult||1.5);
+  return m;
 }
-
-function claimCurrentRewardPath(){
-  const cur = currentRewardDef();
-  if(!cur) return;
-  if((data.rewardPath.progress||0) < cur.target) return alert("Reward is not ready yet.");
-  cur.apply?.();
-  data.rewardPath.claimedHistory ??= [];
-  data.rewardPath.claimedHistory.push(cur.id);
-  if(data.contract?.signed && !data.contract?.fulfilled){
-    data.contractStats.totalRewardsCompleted += 1;
-  }
-  rollNextRewardPath();
-  save();
-  render();
-  if(typeof prettyNotify === "function") prettyNotify("Reward claimed", cur.name, "good");
-  else alert("Reward claimed: " + cur.name);
-}
-
-/* Productivity Boost + Reward Multiplier stack into task completion */
-function v237TaskPointMultiplier(){
-  let mult = 1;
-  const boost = v237Effect("productivityBoost");
-  if(boost && boost.tasks > 0) mult *= Number(boost.mult || 1.25);
-  const rewardMult = v237Effect("taskRewardMult");
-  if(rewardMult && rewardMult.tasks > 0) mult *= Number(rewardMult.mult || 1.5);
-  return mult;
-}
-function v237ConsumeTaskPointEffects(){
+function v2311ConsumeTaskEffects(){
   ["productivityBoost","taskRewardMult"].forEach(id=>{
-    const e = v237Effect(id);
-    if(e && e.tasks){
-      e.tasks -= 1;
-      if(e.tasks <= 0) v237ConsumeEffect(id);
-    }
+    const e=getRewardEffect(id); if(e&&e.tasks){e.tasks--; if(e.tasks<=0)consumeRewardEffect(id);}
   });
 }
-
-/* Override task award to include new Productivity Boost */
 function v235AwardTaskPoints(task){
-  if(!task || task.pointsAwarded) return 0;
-  let earned = v235ApplyDebtToSingleTask(v235BaseTaskPoints(task));
-  earned = Math.round(
-    earned *
-    (1 + (upgradeLevel("pointMultiplier") * 0.015)) *
-    combinedEffectMult("pointGainMult", 1) *
-    v237TaskPointMultiplier()
-  );
-  earned = Math.round(earned * consumeTaskRewardMultiplier(1));
-  v237ConsumeTaskPointEffects();
-  task.pointsAwarded = true;
-  task.pointsEarned = earned;
-  data.points += earned;
-  data.lifetimePoints += Math.max(0, earned);
-  if(data.contract?.signed && !data.contract?.fulfilled){
-    data.contractStats.totalPointsEarned += Math.max(0, earned);
-  }
+  if(!task||task.pointsAwarded)return 0;
+  let earned=v235ApplyDebtToSingleTask(v235BaseTaskPoints(task));
+  earned=Math.round(earned*(1+(upgradeLevel("pointMultiplier")*.015))*combinedEffectMult("pointGainMult",1)*v2311TaskMultiplier());
+  earned=Math.round(earned*consumeTaskRewardMultiplier(1));
+  v2311ConsumeTaskEffects();
+  task.pointsAwarded=true; task.pointsEarned=earned;
+  data.points+=earned; data.lifetimePoints+=Math.max(0,earned);
+  if(data.contract?.signed&&!data.contract?.fulfilled)data.contractStats.totalPointsEarned+=Math.max(0,earned);
   return earned;
 }
 
-/* Smooth Talker */
-var oldV23AngerGainV237 = typeof v23AngerGain === "function" ? v23AngerGain : null;
-function v23AngerGain(playerOffer, dealerOffer){
-  const base = oldV23AngerGainV237 ? oldV23AngerGainV237(playerOffer, dealerOffer) : 0;
-  if(v237Effect("smoothTalker")){
-    return Math.round(base * 0.5);
-  }
-  return base;
-}
-
-/* Dealer's Vacation: next market offer selected is accepted instantly */
-var oldV23SelectOfferV237 = typeof v23SelectOffer === "function" ? v23SelectOffer : null;
+var v2311OldSelectOffer=typeof v23SelectOffer==="function"?v23SelectOffer:null;
 function v23SelectOffer(id){
   v23EnsureMarket?.();
-  if(data.chastityMarket.activeContract?.status === "active") return alert("Only one active lock contract is allowed.");
-  const chosen = data.chastityMarket.offers.find(o=>o.id===id);
-  if(!chosen) return;
-
-  if(v237ConsumeEffect("dealersVacation")){
-    data.chastityMarket.negotiation = {
-      original:{...chosen},
-      dealerOffer:{...chosen},
-      userOffer:{...chosen},
-      rounds:0,
-      history:[
-        {who:"Market", offer:{...chosen}},
-        {who:"Dealer", text:"Accepted instantly — Dealer's Vacation"}
-      ],
-      accepted:true,
-      acceptedOffer:{...chosen}
-    };
-    v23PrepareContract(chosen);
-    save(); render();
-    if(typeof prettyNotify === "function") prettyNotify("Dealer's Vacation", "Market offer accepted instantly.", "good");
-    return;
+  if(data.chastityMarket?.activeContract?.status==="active")return alert("Only one active lock contract is allowed.");
+  const chosen=data.chastityMarket?.offers?.find(o=>o.id===id); if(!chosen)return;
+  if(consumeRewardEffect("dealersVacation")){
+    data.chastityMarket.negotiation={original:{...chosen},dealerOffer:{...chosen},userOffer:{...chosen},rounds:0,history:[{who:"Market",offer:{...chosen}},{who:"Dealer",text:"Accepted instantly — Dealer's Vacation"}],accepted:true,acceptedOffer:{...chosen}};
+    v23PrepareContract(chosen); save(); render(); prettyNotify?.("Dealer's Vacation","Market offer accepted instantly.","good"); return;
   }
-
-  if(oldV23SelectOfferV237) return oldV23SelectOfferV237(id);
+  return v2311OldSelectOffer?v2311OldSelectOffer(id):undefined;
 }
-window.v23SelectOffer = v23SelectOffer;
+window.v23SelectOffer=v23SelectOffer;
 
-/* Smooth Talker consumes when a contract is prepared or negotiation closes */
-var oldV23PrepareContractV237 = typeof v23PrepareContract === "function" ? v23PrepareContract : null;
-function v23PrepareContract(offer){
-  const r = oldV23PrepareContractV237 ? oldV23PrepareContractV237(offer) : undefined;
-  v237ConsumeEffect("smoothTalker");
-  return r;
+var v2311OldAngerGain=typeof v23AngerGain==="function"?v23AngerGain:null;
+function v23AngerGain(playerOffer,dealerOffer){
+  const base=v2311OldAngerGain?v2311OldAngerGain(playerOffer,dealerOffer):0;
+  return getRewardEffect("smoothTalker")?Math.round(base*.5):base;
 }
+var v2311OldPrepare=typeof v23PrepareContract==="function"?v23PrepareContract:null;
+function v23PrepareContract(offer){const r=v2311OldPrepare?v2311OldPrepare(offer):undefined; consumeRewardEffect("smoothTalker"); return r;}
 
-/* Reworked roulette rerolls:
-   - 3 roulette rolls/day still applies for fresh rolls
-   - Rerolls cost 50, 100, 150... until a roulette reward is completed
-   - Jackpot Protection makes next reroll free, but reroll still increments cost counter
-*/
-function v237RerollCost(){
-  if(v237Effect("jackpotProtection")) return 0;
-  const inflation = v237Effect("rouletteInflation") ? 2 : 1;
-  return 50 * (Number(data.v237?.rouletteRerollCount || 0) + 1) * inflation;
-}
-function v237ResetRerollCounter(){
-  ensureV237Data();
-  data.v237.rouletteRerollCount = 0;
-  v237ConsumeEffect("rouletteInflation");
-}
-
+function v2311RerollCost(){if(getRewardEffect("jackpotProtection"))return 0; return 50*(Number(data.v2311?.rouletteRerollCount||0)+1)*(getRewardEffect("rouletteInflation")?2:1);}
+function v2311ResetRerollCost(){ensureV2311Data(); data.v2311.rouletteRerollCount=0; consumeRewardEffect("rouletteInflation");}
 function v22RollRouletteReward(existingId=null){
-  ensureV237Data();
-  v22ResetRouletteIfNewDay();
-
-  if(!data.todayResults || data.lastRollDate !== localDateString()) return alert("Daily Roll first.");
-  if(!v22AllCurrentTasksComplete()) return alert("Complete current tasks before rolling roulette.");
-  if(data.rouletteRewards.rolls.length >= 3 && !existingId) return alert("All 3 roulette rolls have been used today.");
-  if(!data.roulette.entries.length) return alert("No roulette entries configured.");
-
-  let roll = existingId ? data.rouletteRewards.rolls.find(r=>r.id===existingId) : null;
-  if(existingId && (!roll || roll.complete)) return alert("This roulette roll cannot be rerolled.");
-
+  ensureV2311Data(); v22ResetRouletteIfNewDay();
+  if(!data.todayResults||data.lastRollDate!==localDateString())return alert("Daily Roll first.");
+  if(!v22AllCurrentTasksComplete())return alert("Complete current tasks before rolling roulette.");
+  if(data.rouletteRewards.rolls.length>=3&&!existingId)return alert("All 3 roulette rolls have been used today.");
+  if(!data.roulette.entries.length)return alert("No roulette entries configured.");
   if(existingId){
-    const cost = v237RerollCost();
-    if(data.points < cost) return alert(`Not enough points. Reroll costs ${cost.toLocaleString()} points.`);
-    data.points -= cost;
-    if(data.contract?.signed && !data.contract?.fulfilled && cost > 0){
-      data.contractStats.totalPointsSpent += cost;
-    }
-    if(v237Effect("jackpotProtection")) v237ConsumeEffect("jackpotProtection");
-    data.v237.rouletteRerollCount = Number(data.v237.rouletteRerollCount || 0) + 1;
+    const roll=data.rouletteRewards.rolls.find(r=>r.id===existingId); if(!roll||roll.complete)return alert("This roulette roll cannot be rerolled.");
+    const cost=v2311RerollCost(); if(data.points<cost)return alert(`Not enough points. Reroll costs ${cost.toLocaleString()} points.`);
+    data.points-=cost; if(data.contract?.signed&&!data.contract?.fulfilled&&cost>0)data.contractStats.totalPointsSpent+=cost;
+    if(getRewardEffect("jackpotProtection"))consumeRewardEffect("jackpotProtection");
+    data.v2311.rouletteRerollCount=Number(data.v2311.rouletteRerollCount||0)+1;
   }
-
-  const picked = weightedRoll(data.roulette.entries);
-  const reward = v22RouletteRewardAmount(picked);
-  const obj = {
-    id: existingId || uid(),
-    name:picked.name,
-    url:picked.url,
-    weight:Number(picked.weight)||1,
-    reward,
-    complete:false,
-    rerolled:!!existingId,
-    rerollCount:Number(data.v237.rouletteRerollCount||0)
-  };
-
-  if(existingId){
-    const idx = data.rouletteRewards.rolls.findIndex(r=>r.id===existingId);
-    data.rouletteRewards.rolls[idx] = obj;
-  } else {
-    data.rouletteRewards.rolls.push(obj);
-  }
-
-  try{
-    const w = window.open("about:blank","_blank");
-    if(w) w.location.href = obj.url;
-    else window.open(obj.url,"_blank");
-  }catch(e){ window.open(obj.url,"_blank"); }
-
+  const picked=weightedRoll(data.roulette.entries), reward=v22RouletteRewardAmount(picked);
+  const obj={id:existingId||uid(),name:picked.name,url:picked.url,weight:Number(picked.weight)||1,reward,complete:false};
+  if(existingId){const idx=data.rouletteRewards.rolls.findIndex(r=>r.id===existingId);data.rouletteRewards.rolls[idx]=obj;}else data.rouletteRewards.rolls.push(obj);
+  try{const w=window.open("about:blank","_blank"); if(w)w.location.href=obj.url; else window.open(obj.url,"_blank");}catch(e){window.open(obj.url,"_blank");}
   save(); render();
 }
-window.v22RollRouletteReward = v22RollRouletteReward;
-
+window.v22RollRouletteReward=v22RollRouletteReward;
 function v22CompleteRouletteReward(id){
-  ensureV237Data();
-  v22ResetRouletteIfNewDay();
-  const r = data.rouletteRewards.rolls.find(x=>x.id===id);
-  if(!r || r.complete) return;
-  r.complete = true;
-  data.points += Number(r.reward)||0;
-  data.lifetimePoints += Math.max(0, Number(r.reward)||0);
-  if(data.contract?.signed && !data.contract?.fulfilled){
-    data.contractStats.totalPointsEarned += Math.max(0, Number(r.reward)||0);
-  }
-  v237ResetRerollCounter();
-  save(); render();
-  if(typeof prettyNotify === "function") prettyNotify("Roulette complete", `+${Number(r.reward||0).toLocaleString()} points`, "good");
-  else alert(`Roulette completed. You earned ${Number(r.reward||0).toLocaleString()} points.`);
+  v22ResetRouletteIfNewDay(); const r=data.rouletteRewards.rolls.find(x=>x.id===id); if(!r||r.complete)return;
+  r.complete=true; data.points+=Number(r.reward)||0; data.lifetimePoints+=Math.max(0,Number(r.reward)||0);
+  if(data.contract?.signed&&!data.contract?.fulfilled)data.contractStats.totalPointsEarned+=Math.max(0,Number(r.reward)||0);
+  v2311ResetRerollCost(); save(); render(); prettyNotify?.("Roulette complete",`+${Number(r.reward||0).toLocaleString()} points`,"good");
 }
-window.v22CompleteRouletteReward = v22CompleteRouletteReward;
+window.v22CompleteRouletteReward=v22CompleteRouletteReward;
 
-/* New punishments replacing obsolete legacy ones */
-function v237AddWeeklyDisciplinePenalty(){
-  v237AddEffect({id:"weeklyDisciplinePenalty", name:"Weekly Discipline Penalty", weeks:1});
+function v2311WeeklyDisciplinePenalty(){addRewardEffect({id:"weeklyDisciplinePenalty",name:"Weekly Discipline Penalty"});}
+function v2311DealerGrudge(){addRewardEffect({id:"dealerGrudge",name:"Dealer Grudge"});}
+function v2311MarketBlacklist(){addRewardEffect({id:"marketBlacklist",name:"Market Blacklist"});}
+function v2311RouletteInflation(){addRewardEffect({id:"rouletteInflation",name:"Roulette Inflation"});}
+function v2311PatchPunishments(){
+  ["PUNISHMENTS","PUNISHMENT_PRESETS","PUNISHMENT_LIST"].forEach(name=>{
+    const arr=globalThis[name]; if(!Array.isArray(arr))return;
+    arr.forEach(p=>{
+      if(p.name==="Cum Tax Increase x3"){p.name="Weekly Discipline Penalty";p.desc="Next weekly orgasm check counts one interval worse.";p.apply=v2311WeeklyDisciplinePenalty;}
+      if(p.name==="Chastity Increase x3"){p.name="Dealer Grudge";p.desc="Next dealer starts with +25 anger.";p.apply=v2311DealerGrudge;}
+      if(p.name==="Chastity Base +10%"){p.name="Market Blacklist";p.desc="Next dealer satisfaction threshold is higher.";p.apply=v2311MarketBlacklist;}
+      if(p.name==="Roulette Base +1%"){p.name="Roulette Inflation";p.desc="Reroll costs are doubled until a roulette reward is completed.";p.apply=v2311RouletteInflation;}
+    });
+  });
 }
-function v237WeeklyAdjustedTotal(total){
-  const e = v237Effect("weeklyDisciplinePenalty");
-  if(!e) return total;
-  // Worsen one interval: 0 -> 1, 1-5 -> 6-10, etc.
-  const interval = total === 0 ? 0 : Math.ceil(total/5);
-  const worsenedInterval = interval + 1;
-  if(worsenedInterval === 0) return 0;
-  return (worsenedInterval - 1) * 5 + 1;
-}
+v2311PatchPunishments();
 
-var oldV22WeeklyPointsV237 = typeof v22WeeklyPoints === "function" ? v22WeeklyPoints : null;
-function v22WeeklyPoints(total){
-  return oldV22WeeklyPointsV237 ? oldV22WeeklyPointsV237(v237WeeklyAdjustedTotal(total)) : Math.round(1000-(Math.ceil(v237WeeklyAdjustedTotal(total)/5)*333.33));
-}
-var oldV22WeeklyBarsV237 = typeof v22WeeklyBars === "function" ? v22WeeklyBars : null;
-function v22WeeklyBars(total){
-  return oldV22WeeklyBarsV237 ? oldV22WeeklyBarsV237(v237WeeklyAdjustedTotal(total)) : {reward:0,punishment:0};
-}
-
-function v237DealerGrudge(){
-  v237AddEffect({id:"dealerGrudge", name:"Dealer Grudge"});
-}
-function v237MarketBlacklist(){
-  v237AddEffect({id:"marketBlacklist", name:"Market Blacklist"});
-}
-function v237RouletteInflation(){
-  v237AddEffect({id:"rouletteInflation", name:"Roulette Inflation"});
-}
-
-/* Apply dealer punishment effects */
-var oldV23DealerV237 = typeof v23Dealer === "function" ? v23Dealer : null;
+var v2311OldDealer=typeof v23Dealer==="function"?v23Dealer:null;
 function v23Dealer(){
-  const d = oldV23DealerV237 ? oldV23DealerV237() : {targetPPH:20,durationPref:{target:18},temperament:{threshold:78, angerMult:1, push:1},anger:0};
-  if(v237Effect("dealerGrudge")){
-    d.anger = Number(d.anger||0) + 25;
-    v237ConsumeEffect("dealerGrudge");
-  }
-  if(v237Effect("marketBlacklist")){
-    d.temperament = {...d.temperament, threshold:(Number(d.temperament?.threshold||78)+10)};
-    v237ConsumeEffect("marketBlacklist");
-  }
+  const d=v2311OldDealer?v2311OldDealer():{targetPPH:20,durationPref:{target:18},temperament:{threshold:78,angerMult:1,push:1},anger:0};
+  if(consumeRewardEffect("dealerGrudge"))d.anger=Number(d.anger||0)+25;
+  if(consumeRewardEffect("marketBlacklist"))d.temperament={...d.temperament,threshold:Number(d.temperament?.threshold||78)+10};
   return d;
 }
+var v2311OldWeeklyPoints=typeof v22WeeklyPoints==="function"?v22WeeklyPoints:null;
+var v2311OldWeeklyBars=typeof v22WeeklyBars==="function"?v22WeeklyBars:null;
+function v2311AdjustedWeeklyTotal(total){if(!getRewardEffect("weeklyDisciplinePenalty"))return total; const interval=total===0?0:Math.ceil(total/5); return interval*5+1;}
+function v22WeeklyPoints(total){return v2311OldWeeklyPoints?v2311OldWeeklyPoints(v2311AdjustedWeeklyTotal(total)):Math.round(1000-(Math.ceil(v2311AdjustedWeeklyTotal(total)/5)*333.33));}
+function v22WeeklyBars(total){const r=v2311OldWeeklyBars?v2311OldWeeklyBars(v2311AdjustedWeeklyTotal(total)):{reward:0,punishment:0}; if(getRewardEffect("weeklyDisciplinePenalty"))consumeRewardEffect("weeklyDisciplinePenalty"); return r;}
 
-/* Replace old punishment definitions by name at render/apply time */
-function v237ReplacePunishment(p){
-  const name = p.name;
-  if(name === "Cum Tax Increase x3") return {name:"Weekly Discipline Penalty", rarity:"Uncommon", apply:v237AddWeeklyDisciplinePenalty};
-  if(name === "Chastity Increase x3") return {name:"Dealer Grudge", rarity:"Uncommon", apply:v237DealerGrudge};
-  if(name === "Chastity Base +10%") return {name:"Market Blacklist", rarity:"Epic", apply:v237MarketBlacklist};
-  if(name === "Roulette Base +1%") return {name:"Roulette Inflation", rarity:"Epic", apply:v237RouletteInflation};
-  return p;
-}
-if(typeof PUNISHMENTS !== "undefined" && Array.isArray(PUNISHMENTS)){
-  for(let i=0;i<PUNISHMENTS.length;i++) PUNISHMENTS[i] = v237ReplacePunishment(PUNISHMENTS[i]);
-}
-
-/* Ensure punishment wheel uses replaced pool */
-var oldV18RollOnePunishmentAnimatedV237 = typeof v18RollOnePunishmentAnimated === "function" ? v18RollOnePunishmentAnimated : null;
-async function v18RollOnePunishmentAnimated(){
-  if(typeof PUNISHMENTS !== "undefined" && Array.isArray(PUNISHMENTS)){
-    for(let i=0;i<PUNISHMENTS.length;i++) PUNISHMENTS[i] = v237ReplacePunishment(PUNISHMENTS[i]);
-  }
-  return oldV18RollOnePunishmentAnimatedV237 ? await oldV18RollOnePunishmentAnimatedV237() : null;
-}
-
-/* Dashboard controls: show reroll costs and active reward effects */
-var oldRenderV22DashboardV237 = typeof renderV22Dashboard === "function" ? renderV22Dashboard : null;
-function renderV22Dashboard(){
-  if(typeof oldRenderV22DashboardV237 !== "undefined" && oldRenderV22DashboardV237) oldRenderV22DashboardV237();
-
-  const resultsEl = document.getElementById("results");
-  if(resultsEl && data.todayResults && data.rouletteRewards?.rolls?.length){
-    const cards = resultsEl.querySelectorAll(".roulette-reward-card");
-    cards.forEach((card, idx)=>{
-      const roll = data.rouletteRewards.rolls[idx];
-      if(!roll) return;
-      const btn = card.querySelector("button");
-      if(btn && !roll.complete){
-        const cost = v237RerollCost();
-        btn.textContent = cost === 0 ? "Reroll (Free)" : `Reroll (${cost.toLocaleString()} pts)`;
-      }
-    });
-  }
-}
-
-/* Render reward effects text with new names if old renderer exists */
-var oldRenderRewardV237 = typeof renderReward === "function" ? renderReward : null;
-function renderReward(){
-  if(typeof oldRenderRewardV237 !== "undefined" && oldRenderRewardV237) oldRenderRewardV237();
-  const info = document.getElementById("rewardPathInfo");
-  if(info && data.rewardEffects?.length){
-    const effects = data.rewardEffects.map(e=>{
-      if(e.tasks) return `${esc(e.name)}: ${e.tasks} task${e.tasks===1?"":"s"} left`;
-      if(e.completedDays) return `${esc(e.name)}: ${e.completedDays} completed day${e.completedDays===1?"":"s"} left`;
-      return esc(e.name);
-    }).join("<br>");
-    const box = document.createElement("div");
-    box.className = "reward-effects";
-    box.innerHTML = `<b>Active Reward/Punishment Effects</b><br>${effects}`;
-    info.appendChild(box);
-  }
-}
-
-ensureV237Data();
-if(typeof PUNISHMENTS !== "undefined" && Array.isArray(PUNISHMENTS)){
-  for(let i=0;i<PUNISHMENTS.length;i++) PUNISHMENTS[i] = v237ReplacePunishment(PUNISHMENTS[i]);
-}
-save?.();
-render?.();
-
-
-/* V23.8 init-order safety */
-if(typeof oldRenderRewardV237 === "undefined") var oldRenderRewardV237 = null;
-if(typeof oldRenderV22DashboardV237 === "undefined") var oldRenderV22DashboardV237 = null;
-
-
-/* V23.9 stack overflow fix: final non-recursive renderers */
-
-function renderReward(){
-  try{
-    if(typeof ensureV15Data === "function") ensureV15Data();
-    const cur = typeof currentRewardDef === "function" ? currentRewardDef() : null;
-    const title = document.getElementById("rewardTitle");
-    const bar = document.getElementById("rewardBar");
-    const progress = document.getElementById("rewardProgress");
-    const badge = document.getElementById("rewardLockBadge");
-    const info = document.getElementById("rewardPathInfo");
-    const details = document.getElementById("rewardDetails");
-
-    if(details) details.classList.add("hidden");
-    if(title) title.textContent = cur ? cur.name : "No reward active";
-    if(bar){
-      bar.max = cur ? cur.target : 1;
-      bar.value = data.rewardPath?.progress || 0;
-    }
-    if(progress){
-      const pct = cur ? Math.round(((data.rewardPath?.progress || 0) / cur.target) * 100) : 0;
-      progress.textContent = cur ? `${data.rewardPath?.progress || 0} / ${cur.target} task sets · ${pct}%` : "0 / 0";
-    }
-    if(badge) badge.textContent = "Reward Path";
-    if(info && cur){
-      const ready = (data.rewardPath?.progress || 0) >= cur.target;
-      const effects = (data.rewardEffects || []).map(e=>{
-        if(e.tasks) return `${esc(e.name)}: ${e.tasks} task${e.tasks===1?"":"s"} left`;
-        if(e.completedDays) return `${esc(e.name)}: ${e.completedDays} completed day${e.completedDays===1?"":"s"} left`;
-        return esc(e.name);
-      }).join("<br>");
-      info.innerHTML = `
-        <div class="muted">${esc(cur.text || "")}</div>
-        ${ready ? `<button onclick="claimCurrentRewardPath()" class="claim reward-claim">Claim Reward</button>` : ""}
-        ${effects ? `<div class="reward-effects"><b>Active Reward/Punishment Effects</b><br>${effects}</div>` : ""}
-      `;
-    }
-  }catch(e){
-    console.warn("renderReward skipped:", e.message);
-  }
-}
-
-function renderV22Dashboard(){
-  try{
-    if(typeof renderV22DashboardCore === "function") return renderV22DashboardCore();
-    // Minimal dashboard fallback if old implementation is unavailable/recursive.
-    const org = document.getElementById("orgasmDashboardCard");
-    if(org && data.orgasm){
-      org.innerHTML = `
-        <div class="screen-head"><div><span class="tiny">Counter</span><h2>Orgasms</h2></div><button onclick="v22RecordOrgasm()">+1 Orgasm</button></div>
-        <div class="orgasm-grid">
-          <div><span>Today</span><b>${data.orgasm.todayReal || 0}</b></div>
-          <div><span>This Week</span><b>${data.orgasm.weekTotal || 0}</b></div>
-          <div><span>All-Time Orgasms</span><b>${data.orgasm.lifetimeReal || 0}</b></div>
-          <div><span>Skipped Days</span><b>${data.orgasm.skippedDays || 0}</b></div>
-        </div>`;
-    }
-    const resultsEl = document.getElementById("results");
-    if(resultsEl && data.todayResults && !resultsEl.querySelector(".v22-extra-controls")){
-      const can = typeof v22AllCurrentTasksComplete === "function" && v22AllCurrentTasksComplete() && data.lastRollDate === localDateString();
-      if(typeof v22ResetRouletteIfNewDay === "function") v22ResetRouletteIfNewDay();
-      const rolls = data.rouletteRewards?.rolls || [];
-      const c = document.createElement("div");
-      c.className = "v22-extra-controls";
-      c.innerHTML = `
-        <button onclick="v22RollMoreTasks()" ${can?"":"disabled"}>Roll More Tasks</button>
-        <button onclick="v22RollRouletteReward()" ${can && rolls.length < 3 ? "" : "disabled"}>Roll Roulette Reward (${rolls.length}/3)</button>
-        ${rolls.map(r=>{
-          const cost = typeof v237RerollCost === "function" ? v237RerollCost() : 50;
-          return `<div class="roulette-reward-card">
-            <b>${esc(r.name)}</b>
-            <span>Reward: ${Number(r.reward||0).toLocaleString()} points · Weight ${esc(r.weight)}</span>
-            <div class="row">
-              <button onclick="v22RollRouletteReward('${r.id}')" ${r.complete?"disabled":""}>${cost===0?"Reroll (Free)":`Reroll (${cost.toLocaleString()} pts)`}</button>
-              <button class="claim" onclick="v22CompleteRouletteReward('${r.id}')" ${r.complete?"disabled":""}>${r.complete?"Completed":"Mark Complete"}</button>
-            </div>
-          </div>`;
-        }).join("")}
-        ${data.pointPenaltyDebt ? `<div class="v22-penalty-note">Point penalty debt: next ${data.pointPenaltyDebt} completed task${data.pointPenaltyDebt===1?"":"s"} worth 75%.</div>` : ""}
-      `;
-      resultsEl.appendChild(c);
-    }
-  }catch(e){
-    console.warn("renderV22Dashboard skipped:", e.message);
-  }
-}
-
-/* Make final render non-recursive by guarding re-entry */
-var v239Rendering = false;
-const renderBeforeV239 = typeof render === "function" ? render : function(){};
-render = function(){
-  if(v239Rendering) return;
-  v239Rendering = true;
-  try{
-    renderBeforeV239();
-  }catch(e){
-    if(!(String(e).includes("Maximum call stack") || String(e).includes("null"))){
-      console.warn("base render warning:", e.message);
-    }
-  }
-  try{ renderReward(); }catch(e){}
-  try{ if(typeof renderChastityMarket === "function") renderChastityMarket(); }catch(e){}
-  try{ renderV22Dashboard(); }catch(e){}
-  v239Rendering = false;
-};
-
-try{ render(); }catch(e){ console.warn("V23.9 initial render warning:", e.message); }
-
-
-/* V23.10 flat render: never call previous render wrapper */
-function v2310SafeCall(fnName){
-  try{
-    const fn = globalThis[fnName];
-    if(typeof fn === "function" && fnName !== "render") return fn();
-  }catch(e){
-    console.warn(`Skipped ${fnName}:`, e.message);
-  }
-}
-
+var v2311OldRender=typeof render==="function"?render:null;
 function render(){
-  if(window.__v2310Rendering) return;
-  window.__v2310Rendering = true;
-
-  ["ensureSystemsData","ensureV15Data","ensureV20Data","ensureV22Data","ensureV23Data","ensureV237Data"].forEach(fn=>{
-    try{ if(typeof globalThis[fn] === "function") globalThis[fn](); }catch(e){}
-  });
-
-  try{
-    const pts = document.getElementById("points");
-    if(pts) pts.textContent = Number(data.points || 0).toLocaleString();
-    const streak = document.getElementById("streak");
-    if(streak) streak.textContent = Number(data.currentStreak || 0).toLocaleString();
-  }catch(e){}
-
-  [
-    "renderReward",
-    "renderResults",
-    "renderV22Dashboard",
-    "renderChastityMarket",
-    "renderRoulette",
-    "renderContract",
-    "renderPunishments",
-    "renderUpgrades",
-    "renderCages",
-    "renderContent",
-    "renderTasks",
-    "renderOutfits",
-    "renderSettings"
-  ].forEach(v2310SafeCall);
-
-  window.__v2310Rendering = false;
+  if(window.__v2311Rendering)return;
+  window.__v2311Rendering=true;
+  try{if(v2311OldRender)v2311OldRender();}catch(e){console.warn("render warning",e.message);}
+  try{document.querySelectorAll(".roulette-reward-card").forEach(card=>{const b=[...card.querySelectorAll("button")].find(x=>x.textContent.includes("Reroll")); if(b&&!b.disabled){const c=v2311RerollCost(); b.textContent=c===0?"Reroll (Free)":`Reroll (${c.toLocaleString()} pts)`;}});}catch(e){}
+  window.__v2311Rendering=false;
 }
 
-function scheduleRender(){
-  if(window.__v2310RenderScheduled) return;
-  window.__v2310RenderScheduled = true;
-  setTimeout(()=>{
-    window.__v2310RenderScheduled = false;
-    render();
-  }, 0);
-}
-
-try{ render(); }catch(e){ console.warn("V23.10 render warning:", e.message); }
+ensureV2311Data(); v2311CleanLegacyRewards(); v2311PatchPunishments(); save?.(); render?.();
